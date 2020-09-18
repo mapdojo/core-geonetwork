@@ -264,7 +264,7 @@
           <encoding>UTF-8</encoding>
         </configuration>
       </plugin>
-   
+
       <!-- run integration tests after unit tests -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -1398,9 +1398,9 @@
     <db.config.file>../config-db/${db.type}.xml</db.config.file>
     <db.host>#{systemEnvironment['GEONETWORK_DB_HOST']?:'localhost'}</db.host>
     <db.port>#{systemEnvironment['GEONETWORK_DB_PORT']?:'1433'}</db.port>
-    <db.name>#{systemEnvironment['GEONETWORK_DB_NAME']?:'Gnos'}</db.name>
-    <db.username>#{systemEnvironment['GEONETWORK_DB_USERNAME']?:'gnos'}</db.username>
-    <db.password>#{systemEnvironment['GEONETWORK_DB_PASSWORD']?:'appetite-paradigm-cyclic'}</db.password>
+    <db.name>#{systemEnvironment['GEONETWORK_DB_NAME']?:'gn'}</db.name>
+    <db.username>#{systemEnvironment['GEONETWORK_DB_USERNAME']?:'www-data'}</db.username>
+    <db.password>#{systemEnvironment['GEONETWORK_DB_PASSWORD']?:'www-data'}</db.password>
     <db.connectionProperties>#{systemEnvironment['GEONETWORK_DB_CONNECTION_PROPERTIES']}</db.connectionProperties>
 
     <db.pool.maxActive>30</db.pool.maxActive>
