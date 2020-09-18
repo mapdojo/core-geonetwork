@@ -288,6 +288,11 @@
       <groupId>mysql</groupId>
       <artifactId>mysql-connector-java</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.microsoft.sqlserver</groupId>
+      <artifactId>mssql-jdbc</artifactId>
+      <version>8.4.1.jre8</version>
+    </dependency>
     <!-- Not permitted under oracle licensing rules
     <dependency>
       <groupId>ojdbc</groupId>
