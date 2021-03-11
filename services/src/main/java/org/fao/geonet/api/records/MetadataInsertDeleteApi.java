@@ -51,6 +51,7 @@ import org.fao.geonet.domain.AbstractMetadata;
 import org.fao.geonet.domain.ISODate;
 import org.fao.geonet.domain.Metadata;
 import org.fao.geonet.domain.MetadataCategory;
+import org.fao.geonet.domain.MetadataDraft;
 import org.fao.geonet.domain.MetadataResource;
 import org.fao.geonet.domain.MetadataResourceVisibility;
 import org.fao.geonet.domain.MetadataType;
@@ -61,7 +62,9 @@ import org.fao.geonet.domain.ReservedOperation;
 import org.fao.geonet.domain.UserGroup;
 import org.fao.geonet.domain.utils.ObjectJSONUtils;
 import org.fao.geonet.events.history.RecordCreateEvent;
+import org.fao.geonet.events.history.RecordDeletedEvent;
 import org.fao.geonet.events.history.RecordImportedEvent;
+import org.fao.geonet.exceptions.BadFormatEx;
 import org.fao.geonet.exceptions.BadParameterEx;
 import org.fao.geonet.exceptions.XSDValidationErrorEx;
 import org.fao.geonet.kernel.AccessManager;
@@ -207,8 +210,15 @@ public class MetadataInsertDeleteApi {
             MetadataUtils.backupRecord(metadata, context);
         }
 
-        store.delResources(context, metadata.getUuid(), true);
+        boolean approved=true;
+        if (metadata instanceof MetadataDraft) {
+            approved=false;
+        }
+
+        store.delResources(context, metadata.getUuid(), approved);
         metadataManager.deleteMetadata(context, metadata.getId() + "");
+
+        triggerDeleteEvent(request, metadata);
 
         searchManager.forceIndexChanges();
     }
@@ -257,6 +267,8 @@ public class MetadataInsertDeleteApi {
                 store.delResources(context, metadata.getUuid());
 
                 metadataManager.deleteMetadata(context, String.valueOf(metadata.getId()));
+
+                triggerDeleteEvent(request, metadata);
 
                 report.incrementProcessedRecords();
                 report.addMetadataId(metadata.getId());
@@ -312,7 +324,7 @@ public class MetadataInsertDeleteApi {
             }
             Pair<Integer, String> pair = loadRecord(metadataType, element, uuidProcessing, group, category,
                     rejectIfInvalid, publishToAll, transformWith, schema, extra, request);
-            report.addMetadataInfos(pair.one(), String.format("Metadata imported from XML with UUID '%s'", pair.two()));
+            report.addMetadataInfos(pair.one(), pair.two(), !publishToAll, false, String.format("Metadata imported from XML with UUID '%s'", pair.two()));
 
             triggerImportEvent(request, pair.two());
 
@@ -329,7 +341,7 @@ public class MetadataInsertDeleteApi {
                 if (xmlContent != null) {
                     Pair<Integer, String> pair = loadRecord(metadataType, xmlContent, uuidProcessing, group, category,
                             rejectIfInvalid, publishToAll, transformWith, schema, extra, request);
-                    report.addMetadataInfos(pair.one(),
+                    report.addMetadataInfos(pair.one(), pair.two(), !publishToAll, false,
                             String.format("Metadata imported from URL with UUID '%s'", pair.two()));
 
                     triggerImportEvent(request, pair.two());
@@ -375,7 +387,7 @@ public class MetadataInsertDeleteApi {
                                 uuidProcessing, transformWith, settingManager.getSiteId(), metadataType, category,
                                 group, rejectIfInvalid, assignToCatalog, context, f);
                         for (String id : ids) {
-                            report.addMetadataInfos(Integer.parseInt(id),
+                            report.addMetadataInfos(Integer.parseInt(id), id, !publishToAll, false,
                                     String.format("Metadata imported from MEF with id '%s'", id));
                             triggerCreationEvent(request, id);
 
@@ -390,7 +402,7 @@ public class MetadataInsertDeleteApi {
                     try {
                         Pair<Integer, String> pair = loadRecord(metadataType, Xml.loadFile(f), uuidProcessing, group,
                                 category, rejectIfInvalid, publishToAll, transformWith, schema, extra, request);
-                        report.addMetadataInfos(pair.one(),
+                        report.addMetadataInfos(pair.one(), pair.two(), !publishToAll, false,
                                 String.format("Metadata imported from server folder with UUID '%s'", pair.two()));
 
                         triggerCreationEvent(request, pair.two());
@@ -556,8 +568,13 @@ public class MetadataInsertDeleteApi {
                         List<String> ids = MEFLib.doImport(version == MEFLib.Version.V1 ? "mef" : "mef2",
                                 uuidProcessing, transformWith, settingManager.getSiteId(), metadataType, category,
                                 group, rejectIfInvalid, assignToCatalog, context, tempFile);
+                        if (ids.isEmpty()) {
+                            //we could have used a finer-grained error handling inside the MEFLib import call (MEF MD file processing)
+                            //This is a catch-for-call for the case when there is no record is imported, to notify the user the import is not successful.
+                            throw new BadFormatEx("Import 0 record, check whether the importing file is a valid MEF archive.");
+                        }
                         ids.forEach(e -> {
-                            report.addMetadataInfos(Integer.parseInt(e),
+                            report.addMetadataInfos(Integer.parseInt(e), e, !publishToAll, false,
                                     String.format("Metadata imported with ID '%s'", e));
 
                             try {
@@ -582,7 +599,7 @@ public class MetadataInsertDeleteApi {
                     Pair<Integer, String> pair = loadRecord(metadataType, Xml.loadStream(f.getInputStream()),
                             uuidProcessing, group, category, rejectIfInvalid, publishToAll, transformWith, schema,
                             extra, request);
-                    report.addMetadataInfos(pair.one(), String.format("Metadata imported with UUID '%s'", pair.two()));
+                    report.addMetadataInfos(pair.one(), pair.two(), !publishToAll, false, String.format("Metadata imported with UUID '%s'", pair.two()));
 
                     triggerImportEvent(request, pair.two());
 
@@ -723,7 +740,7 @@ public class MetadataInsertDeleteApi {
         }
 
         dataManager.indexMetadata(id);
-        report.addMetadataInfos(Integer.parseInt(id.get(0)), uuid);
+        report.addMetadataInfos(Integer.parseInt(id.get(0)), uuid, !publishToAll, false, uuid);
 
         triggerCreationEvent(request, uuid);
 
@@ -733,7 +750,7 @@ public class MetadataInsertDeleteApi {
     }
 
     /**
-     * This triggers a metadata created event (after save)
+     * This triggers a metadata created event (after save).
      *
      * @param request
      * @param uuid    or id of metadata
@@ -751,7 +768,7 @@ public class MetadataInsertDeleteApi {
     }
 
     /**
-     * This triggers a metadata created event (after save)
+     * This triggers a metadata created event (after save).
      *
      * @param request
      * @param uuid    or id of metadata
@@ -765,6 +782,20 @@ public class MetadataInsertDeleteApi {
         new RecordImportedEvent(metadata.getId(), userSession.getUserIdAsInt(),
                 ObjectJSONUtils.convertObjectInJsonObject(userSession.getPrincipal(), RecordImportedEvent.FIELD),
                 metadata.getData()).publish(applicationContext);
+    }
+
+    /**
+     * Triggers a metadata delete event.
+     *
+     * @param request
+     * @param metadata
+     * @throws Exception
+     */
+    private void triggerDeleteEvent(HttpServletRequest request, AbstractMetadata metadata) {
+        ApplicationContext applicationContext = ApplicationContextHolder.get();
+        UserSession userSession = ApiUtils.getUserSession(request.getSession());
+
+        new RecordDeletedEvent(metadata.getId(), userSession.getUserIdAsInt(), metadata.getData()).publish(applicationContext);
     }
 
     private Pair<Integer, String> loadRecord(MetadataType metadataType, Element xmlElement,

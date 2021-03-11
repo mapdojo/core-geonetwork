@@ -1470,11 +1470,11 @@
                 '</div>';
             modalElt = angular.element('' +
                 '<div class="modal fade in"' +
-                '     id="gn-img-modal-"' + img.id + '>' +
+                '     id="gn-img-modal-' + (img.id || img.lUrl || img.url) + '">' +
                 '<div class="modal-dialog gn-img-modal in">' +
                 '  <button type=button class="btn btn-link gn-btn-modal-img">' +
                 '<i class="fa fa-times text-danger"/></button>' +
-                '  <img src="' + (img.url || img.id) + '"/>' +
+                '  <img src="' + (img.lUrl || img.url || img.id) + '"/>' +
                 (label != '' ? labelDiv : '') +
                 '</div>' +
                 '</div>');
@@ -1601,6 +1601,36 @@
       };
     }
   ]);
+
+
+  /**
+   * @ngdoc gnApiLink
+   * @name gn_utility.directive:gnApiLink
+   *
+   * @description
+   * Convert the element href attribute
+   * from /srv/api/records/... to a link
+   * for the JS apps. This is usefull if
+   * a formatter is loaded into the JS app
+   * in order to have links to record to
+   * open in current app.
+   */
+  module.directive('gnApiLink', ['$compile',
+    function($compile) {
+      return {
+        restrict: 'A',
+        link: function(scope, element, attrs) {
+          var href = $(element).attr('href'),
+              apiPath = '/srv/api/records/';
+          if (href.indexOf(apiPath) != -1) {
+            $(element).attr('href',
+              href.replace(/.*\/srv\/api\/records\//, '#/metadata/'));
+          }
+        }
+      };
+    }
+  ]);
+
 
   /**
    * @ngdoc directive

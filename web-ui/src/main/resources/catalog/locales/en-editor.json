@@ -1,4 +1,5 @@
 {
+    "featureCatReplace": "Replace existing feature catalog?",
     "add-extent-from-geokeywords": "Compute extent from keywords",
     "add-extent-from-geokeywords-help": "Search all keywords from thesaurus of type 'place' and add matching extents.",
     "addCRS-help": "Add new CRS",
@@ -416,5 +417,7 @@
     "accessManagerChooseGroups": "Choose one or more groups",
     "accessManagerChooseOperations": "Choose one or more operation types",
     "status-no-status": "Workflow not active",
-    "draft": "Working copy"
+    "draft": "Working copy",
+    "link": "Link",
+    "link-text": "Link text"
 }
