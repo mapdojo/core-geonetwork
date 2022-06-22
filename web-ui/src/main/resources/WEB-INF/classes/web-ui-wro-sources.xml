@@ -44,6 +44,7 @@
     <jsSource webappPath="/catalog/lib/angular/angular-sanitize.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/angular/angular-gettext.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/angular/angular-cookies.min.js" minimize="false"/>
+    <jsSource webappPath="/catalog/lib/angular/angular-messages.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/angular-translate.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/angular-md5.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/angular.ext/hotkeys/hotkeys.min.js" minimize="false"/>
@@ -75,8 +76,7 @@
     <jsSource webappPath="/catalog/lib/jquery.ext/jquery-ui-slider.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/typeahead.js/typeahead.bundle.js"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/typeahead.js/handlebars-v2.0.0.js"/>
-    <jsSource webappPath="/catalog/lib/bootstrap.ext/tagsinput/bootstrap-tagsinput.min.js"
-              minimize="false"/>
+    <jsSource webappPath="/catalog/lib/bootstrap.ext/tagsinput/bootstrap-tagsinput.js"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/tagsinput/bootstrap-tagsinput-angular.js"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/datepicker/bootstrap-datepicker.js"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/datepicker/bootstrap-datepicker.fr.js"/>
@@ -109,6 +109,7 @@
     <jsSource webappPath="/catalog/lib/angular/angular-sanitize.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/angular/angular-gettext.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/angular/angular-cookies.min.js" minimize="false"/>
+    <jsSource webappPath="/catalog/lib/angular/angular-messages.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/angular.ext/angular-floatThead.js"/>
     <jsSource webappPath="/catalog/lib/angular.ext/date.js"/>
     <jsSource webappPath="/catalog/lib/angular-translate.min.js" minimize="false"/>
@@ -143,8 +144,7 @@
     <jsSource webappPath="/catalog/lib/jquery.ext/jquery-ui-slider.min.js" minimize="false"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/typeahead.js/typeahead.bundle.js"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/typeahead.js/handlebars-v2.0.0.js"/>
-    <jsSource webappPath="/catalog/lib/bootstrap.ext/tagsinput/bootstrap-tagsinput.min.js"
-              minimize="false"/>
+    <jsSource webappPath="/catalog/lib/bootstrap.ext/tagsinput/bootstrap-tagsinput.js"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/tagsinput/bootstrap-tagsinput-angular.js"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/datepicker/bootstrap-datepicker.js"/>
     <jsSource webappPath="/catalog/lib/bootstrap.ext/datepicker/bootstrap-datepicker.fr.js"/>

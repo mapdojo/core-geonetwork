@@ -27,9 +27,10 @@
 
   goog.require('gn_search');
   goog.require('gn_search_form_controller');
+  goog.require('gn_utility_service');
 
   var module = angular.module('gn_admintools_controller',
-      ['gn_search', 'gn_search_form_controller']);
+      ['gn_search', 'gn_search_form_controller', 'gn_utility_service']);
 
 
   module.controller('GnAdminToolsSearchController', [
@@ -202,7 +203,19 @@
                     $translate.instant('group-' + g.groupId);
                 }
               });
-              $scope.userGroups = uniqueUserGroups;
+
+              // Sort by group name and user name
+              var sortedKeys = Object.keys(uniqueUserGroups).sort(function (a, b) {
+                var ka = uniqueUserGroups[a].groupNameTranslated + '|' + uniqueUserGroups[a].userName;
+                var kb = uniqueUserGroups[b].groupNameTranslated + '|' + uniqueUserGroups[b].userName;
+
+                return ka.localeCompare(kb);
+              })
+
+              $scope.userGroups = {};
+              angular.forEach(sortedKeys, function(g) {
+                $scope.userGroups[g] = uniqueUserGroups[g];
+              });
             });
       }
       $scope.selectUser = function(id) {
@@ -215,7 +228,11 @@
                   uniqueGroup[g.group.id] = g.group;
                 }
               });
-              $scope.editorGroups = uniqueGroup;
+
+              // Sort the groups by group name translation
+              $scope.editorGroups = Object.values(uniqueGroup).sort(function(a, b) {
+                return a.label[$scope.lang].localeCompare(b.label[$scope.lang]);
+              });
             });
       };
       $scope.transfertList = {};

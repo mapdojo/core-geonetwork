@@ -23,7 +23,7 @@
 
 package org.fao.geonet.kernel.csw.services.getrecords;
 
-import com.vividsolutions.jts.geom.Geometry;
+import org.locationtech.jts.geom.Geometry;
 
 import jeeves.server.ServiceConfig;
 import jeeves.server.context.ServiceContext;
@@ -79,11 +79,13 @@ import org.fao.geonet.kernel.setting.SettingInfo;
 import org.fao.geonet.utils.Log;
 import org.fao.geonet.utils.Xml;
 import org.geotools.gml2.GMLConfiguration;
-import org.geotools.xml.Encoder;
+import org.geotools.xsd.Encoder;
 import org.jdom.Attribute;
 import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.jdom.Namespace;
+import org.locationtech.jts.geom.MultiPolygon;
+import org.locationtech.jts.geom.Polygon;
 import org.springframework.context.ApplicationContext;
 
 import java.io.ByteArrayOutputStream;
@@ -702,7 +704,16 @@ public class CatalogSearcher implements MetadataRecordSelector {
         encoder.setOmitXMLDeclaration(true);
         encoder.setNamespaceAware(true);
 
+        // Force geometry to multi-polygon
+        if( fullGeom instanceof MultiPolygon) {
+            encoder.encode( (MultiPolygon) fullGeom, org.geotools.gml3.GML.MultiPolygon, out);
+        }
+        else {
+            Log.debug(Geonet.CSW_SEARCH, "Geometry " +fullGeom.getGeometryType()+" transformed to multi-polygon" );
+            encoder.encode(SpatialIndexWriter.toMultiPolygon(fullGeom), org.geotools.gml3.GML.MultiPolygon, out);
+        }
         encoder.encode(SpatialIndexWriter.toMultiPolygon(fullGeom), org.geotools.gml3.GML.MultiPolygon, out);
+
         Element geomElem = org.fao.geonet.csw.common.util.Xml.loadString(out.toString(Constants.ENCODING), false);
         parentElement.setContent(index, geomElem);
     }

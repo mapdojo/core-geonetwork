@@ -152,7 +152,7 @@ public class List {
                                     NativeWebRequest webRequest) throws Exception {
 
         final HttpServletRequest nativeRequest = webRequest.getNativeRequest(HttpServletRequest.class);
-        ServiceContext context = serviceManager.createServiceContext("regions.list", lang, nativeRequest);
+      try (ServiceContext context = serviceManager.createServiceContext("regions.list", lang, nativeRequest)) {
         Collection<RegionsDAO> daos = context.getApplicationContext().getBeansOfType(RegionsDAO.class).values();
 
         long lastModified = -1;
@@ -186,6 +186,7 @@ public class List {
         nativeResponse.setHeader("Cache-Control", "no-cache");
 
         return new ListRegionsResponse(regions);
+      }
     }
 
 }

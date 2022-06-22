@@ -37,6 +37,7 @@
     "chooseContactRole": "eða velja hlutverk",
     "chooseEntry": "Leitarskrá",
     "clickToAddResource": "Smelltu til að velja þessi gögn",
+    "externalResourceManagement": "Click to go to external resource manager",
     "beforeUnloadEditor": "Þú gætir haft óvistaðar breytingar síðan síðast var vistað  {{timeAgo}}.",
     "fieldIsRemoved": "Þessi dálkur verður fjarlægður",
     "editRecords": "Breyta vali",
@@ -420,5 +421,6 @@
     "badGmlProjectionCode": "The geometry projection <b>{{srsName}}</b> defined in the XML is not valid. Please edit the xml to fix the srs name or enter a new geometry.",
     "draft": "Vinnuafrit",
     "link": "Tengill",
-    "link-text": "Link text"
+    "link-text": "Link text",
+    "confirmCancelEdit": "Do you want to cancel all changes and close the editor?"
 }

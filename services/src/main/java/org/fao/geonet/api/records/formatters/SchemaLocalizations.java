@@ -31,7 +31,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
-import com.vividsolutions.jts.util.Assert;
+import org.locationtech.jts.util.Assert;
 
 import groovy.util.slurpersupport.GPathResult;
 
@@ -126,7 +126,7 @@ public class SchemaLocalizations {
         final ServiceContext serviceContext = ServiceContext.get();
         final String lang3 = serviceContext != null ?
             serviceContext.getLanguage() :
-            appContext.getBean(LanguageUtils.class).getIso3langCode(request.getLocales());
+            appContext.getBean(LanguageUtils.class).iso3code(request.getLocales());
         return create(schema, lang3);
     }
 
@@ -317,9 +317,9 @@ public class SchemaLocalizations {
             return null;
         }
         List<IsoLanguage> lang;
-        if (value.equals("deu")) {
-            value = "ger";
-        }
+
+        // ensure the code is in iso-639-2/B
+        value = IsoLanguagesMapper.iso639_2T_to_iso639_2B(value);
 
         if (value.length() == 2) {
             lang = this.languageRepo.findAllByShortCode(value.toLowerCase());

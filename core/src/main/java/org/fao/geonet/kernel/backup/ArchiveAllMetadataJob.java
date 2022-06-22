@@ -64,7 +64,7 @@ import org.springframework.stereotype.Service;
 
 import com.google.common.base.Function;
 import com.google.common.collect.Lists;
-import com.vividsolutions.jts.util.Assert;
+import org.locationtech.jts.util.Assert;
 
 import jeeves.server.UserSession;
 import jeeves.server.context.ServiceContext;
@@ -89,10 +89,11 @@ public class ArchiveAllMetadataJob extends QuartzJobBean {
 
     @Override
     protected void executeInternal(JobExecutionContext jobContext) throws JobExecutionException {
-        ServiceContext serviceContext = serviceManager.createServiceContext("backuparchive", context);
+      try (ServiceContext serviceContext = serviceManager.createServiceContext("backuparchive", context)) {
         serviceContext.setLanguage("eng");
         serviceContext.setAsThreadLocal();
 
+        // note: perhaps already done by setAsThreadLocal() above
         ApplicationContextHolder.set(this.context);
 
         if(!settingManager.getValueAsBool(Settings.METADATA_BACKUPARCHIVE_ENABLE)) {
@@ -105,6 +106,7 @@ public class ArchiveAllMetadataJob extends QuartzJobBean {
         } catch (Exception e) {
             Log.error(Geonet.GEONETWORK, "Error running " + ArchiveAllMetadataJob.class.getSimpleName(), e);
         }
+      }
     }
 
     public void createBackup(ServiceContext serviceContext) throws Exception {

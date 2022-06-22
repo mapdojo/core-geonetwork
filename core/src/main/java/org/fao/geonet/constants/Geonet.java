@@ -1,5 +1,5 @@
 //=============================================================================
-//===	Copyright (C) 2001-2007 Food and Agriculture Organization of the
+//===	Copyright (C) 2001-2022 Food and Agriculture Organization of the
 //===	United Nations (FAO-UN), United Nations World Food Programme (WFP)
 //===	and United Nations Environment Programme (UNEP)
 //===
@@ -31,7 +31,7 @@ import javax.xml.XMLConstants;
 import jeeves.constants.Jeeves;
 
 /**
- * TODO javadoc.
+ * GeoNetwork constants.
  */
 public final class Geonet {
 
@@ -41,6 +41,7 @@ public final class Geonet {
     public static final String CONTEXT_NAME = "contextName";
     // TODO make this configurable
     public static final String DEFAULT_LANGUAGE = "eng";
+    public static final String UNSPECIFIED_LANGUAGE = "?";
 
     public static final String CC_API_REST_URL = "http://api.creativecommons.org/rest/1.5/simple/chooser";
     public static final String LUCENE_LOCALE_KEY = "_locale";
@@ -81,6 +82,7 @@ public final class Geonet {
     public static final String SRU_SEARCH = SRU + ".search";
     public static final String USER_WATCHLIST = GEONETWORK + ".userwatchlist";
     public static final String OAI = GEONETWORK + ".oai";
+    public static final String SECURITY = GEONETWORK + ".security";
     public static final String OAI_HARVESTER = OAI + ".provider";
     // keys for logging search log
     public static final String SEARCH_LOGGER = GEONETWORK + ".search-logger";
@@ -112,6 +114,7 @@ public final class Geonet {
         public static final String UPDATE_FIXED_INFO_SUBTEMPLATE = "update-fixed-info-subtemplate.xsl";
         public static final String UPDATE_CHILD_FROM_PARENT_INFO = "update-child-from-parent-info.xsl";
         public static final String EXTRACT_UUID = "extract-uuid.xsl";
+        public static final String EXTRACT_TITLES = "extract-titles.xsl";
         public static final String EXTRACT_DEFAULT_LANGUAGE = "extract-default-language.xsl";
         public static final String EXTRACT_SKOS_FROM_ISO19135 = "xml_iso19135ToSKOS.xsl";
         public static final String EXTRACT_DATE_MODIFIED = "extract-date-modified.xsl";
@@ -141,7 +144,9 @@ public final class Geonet {
         public static final String METADATA_BRIEF = "metadata-brief.xsl";
         public static final String METADATA_BASEBLANK = "blanks/metadata-schema00";
         public static final String METADATA_BLANK = "blanks/metadata-schema";
+        public static final String ENCRYPTOR_CONFIGURATION = "encryptor.properties";
         public static final int METADATA_MAX_BLANKS = 20;
+
     }
 
     public static final class SchemaPath {
@@ -659,6 +664,7 @@ public final class Geonet {
         public static final String DATABASE_CREATE_DATE = "_createDate";
         public static final String DATABASE_CHANGE_DATE = "_changeDate";
         public static final String SOURCE = "_source";
+        public static final String HARVESTUUID = "_harvesterUuid";
         public static final String IS_TEMPLATE = "_isTemplate";
         public static final String UUID = "_uuid";
         public static final String IS_HARVESTED = "_isHarvested";
@@ -678,6 +684,7 @@ public final class Geonet {
         public static final String CAT = "_cat";
         public static final String STATUS = "_status";
         public static final String STATUS_CHANGE_DATE = "_statusChangeDate";
+        public static final String STATUS_WORKFLOW = "_statusWorkflow";
         public static final String VALID = "_valid";
         public static final String VALID_INSPIRE = "_valid_inspire";
         public static final String ID = "_id";
@@ -693,4 +700,15 @@ public final class Geonet {
     public static class SearchConfig {
         public static final String SEARCH_IGNORE_PORTAL_FILTER_OPTION = "ignorePortalFilter";
     }
+
+    public static final class HttpProtocol {
+        public static final String HTTP = "http";
+        public static final String HTTPS = "https";
+    }
+
+    public static final class DefaultHttpPort {
+        public static final int HTTP = 80;
+        public static final int HTTPS = 443;
+    }
+
 }

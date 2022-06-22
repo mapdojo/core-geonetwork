@@ -91,13 +91,15 @@ goog.require('gn_alert');
             'por': 'pt',
             'rus': 'ru',
             'chi': 'zh',
-            'slo': 'sk'
+            'slo': 'sk',
+            'swe': 'sv'
           },
           'isLogoInHeader': false,
           'logoInHeaderPosition': 'left',
           'fluidHeaderLayout': true,
           'showGNName': true,
-          'isHeaderFixed': false
+          'isHeaderFixed': false,
+          'isMenubarAccessible': true
         },
         'cookieWarning': {
           'enabled': true,
@@ -116,6 +118,7 @@ goog.require('gn_alert');
           'paginationInfo': {
             'hitsPerPage': 20
           },
+          'mapFilterCollapsed': false,
           'facetsSummaryType': 'details',
           'defaultSearchString': '',
           'facetTabField': '',
@@ -198,12 +201,16 @@ goog.require('gn_alert');
             'maps': ['ows']
           },
           'isFilterTagsDisplayedInSearch': false,
+          'showMapInFacet': false,
           'usersearches': {
             'enabled': false,
             'displayFeaturedSearchesPanel': false
           },
           'savedSelection': {
             'enabled': true
+          },
+          "addWMSLayersToMap": {
+            "urlLayerParam": ""
           }
         },
         'map': {
@@ -268,6 +275,11 @@ goog.require('gn_alert');
             'extent': [0, 0, 0, 0],
             'layers': [{'type': 'osm'}]
           },
+          'map-thumbnail': {
+            'context': '../../map/config-viewer.xml',
+            'extent': [0, 0, 0, 0],
+            'layers': []
+          },
           'autoFitOnLayer': false
         },
         'geocoder': {
@@ -303,6 +315,12 @@ goog.require('gn_alert');
         'page': {
           'enabled': true,
           'appUrl': '../../{{node}}/{{lang}}/catalog.search#/page'
+        },
+        'workflowHelper': {
+          'enabled': false,
+          'workflowAssistApps': [
+            {'appUrl': '', 'appLabelKey': ''}
+          ]
         }
       }
     };
@@ -314,7 +332,7 @@ goog.require('gn_alert');
       requireProxy: [],
       gnCfg: angular.copy(defaultConfig),
       gnUrl: '',
-      docUrl: 'https://geonetwork-opensource.org/manuals/3.8.x/',
+      docUrl: 'https://geonetwork-opensource.org/manuals/trunk/',
       //docUrl: '../../doc/',
       modelOptions: {
         updateOn: 'default blur',
@@ -324,8 +342,10 @@ goog.require('gn_alert');
         }
       },
       current: null,
-      shibbolethEnabled: false,
-      shibbolethHideLogin: true,
+      isDisableLoginForm: false,
+      isShowLoginAsLink: false,
+      isUserProfileUpdateEnabled: true,
+      isUserGroupUpdateEnabled: true,
       init: function(config, gnUrl, gnViewerSettings, gnSearchSettings) {
         // start from the default config to make sure every field is present
         // and override with config arg if required
@@ -340,6 +360,54 @@ goog.require('gn_alert');
               }
             }
           }, config).mods.header.languages;
+
+          this.gnCfg.mods.search.sortbyValues = angular.extend({
+            mods: {
+              search: {
+                sortbyValues: []
+              }
+            }
+          }, config).mods.search.sortbyValues;
+
+          this.gnCfg.mods.search.downloadFormatter = angular.extend({
+            mods: {
+              search: {
+                downloadFormatter: []
+              }
+            }
+          }, config).mods.search.downloadFormatter;
+
+          this.gnCfg.mods.search.resultViewTpls = angular.extend({
+            mods: {
+              search: {
+                resultViewTpls: []
+              }
+            }
+          }, config).mods.search.resultViewTpls;
+
+          this.gnCfg.mods.search.formatter = angular.extend({
+            mods: {
+              search: {
+                formatter: {}
+              }
+            }
+          }, config).mods.search.formatter;
+
+          this.gnCfg.mods.search.linkTypes = angular.extend({
+            mods: {
+              search: {
+                linkTypes: {}
+              }
+            }
+          }, config).mods.search.linkTypes;
+
+          this.gnCfg.mods.map.projectionList = angular.extend({
+            mods: {
+              map: {
+                projectionList: []
+              }
+            }
+          }, config).mods.map.projectionList;
         }
 
         this.gnUrl = gnUrl || '../';
@@ -362,7 +430,14 @@ goog.require('gn_alert');
         var copy = angular.copy(defaultConfig);
         copy.mods.header.languages = {};
         copy.mods.search.grid.related = [];
+        copy.mods.search.sortbyValues = [];
+        copy.mods.search.hitsperpageValues = [];
+        copy.mods.search.downloadFormatter = [];
+        copy.mods.search.resultViewTpls = [];
+        copy.mods.search.formatter = {};
+        copy.mods.search.linkTypes = {};
         copy.mods.map["map-editor"].layers = [];
+        copy.mods.map.projectionList = [];
         return copy;
       },
       getProxyUrl: function() {
@@ -489,7 +564,9 @@ goog.require('gn_alert');
       $scope.fluidHeaderLayout = gnGlobalSettings.gnCfg.mods.header.fluidHeaderLayout;
       $scope.showGNName = gnGlobalSettings.gnCfg.mods.header.showGNName;
       $scope.isHeaderFixed = gnGlobalSettings.gnCfg.mods.header.isHeaderFixed;
+      $scope.isMenubarAccessible = gnGlobalSettings.gnCfg.mods.header.isMenubarAccessible;
       $scope.isLogoInHeader = gnGlobalSettings.gnCfg.mods.header.isLogoInHeader;
+      $scope.isFooterEnabled = gnGlobalSettings.gnCfg.mods.footer.enabled;
 
       // If gnLangs current already set by config, do not use URL
       $scope.langs = gnGlobalSettings.gnCfg.mods.header.languages;
@@ -553,7 +630,7 @@ goog.require('gn_alert');
         'fre': 'Français', 'ger': 'Deutsch', 'kor': '한국의',
         'spa': 'Español', 'por': 'Portuguesa', 'cat': 'Català', 'cze': 'Czech',
         'ita': 'Italiano', 'fin': 'Suomeksi', 'ice': 'Íslenska',
-        'rus': 'русский', 'chi': '中文', 'slo': 'Slovenčina'};
+        'rus': 'русский', 'chi': '中文', 'slo': 'Slovenčina', 'swe': 'Svenska'};
       $scope.url = '';
       $scope.gnUrl = gnGlobalSettings.gnUrl;
       $scope.gnCfg = gnGlobalSettings.gnCfg;
@@ -561,11 +638,20 @@ goog.require('gn_alert');
       $scope.logoPath = gnGlobalSettings.gnUrl + '../images/harvesting/';
       $scope.isMapViewerEnabled = gnGlobalSettings.isMapViewerEnabled;
       $scope.isDebug = window.location.search.indexOf('debug') !== -1;
-      $scope.shibbolethEnabled = gnGlobalSettings.shibbolethEnabled;
-      $scope.shibbolethHideLogin = gnGlobalSettings.shibbolethHideLogin;
+      $scope.isDisableLoginForm = gnGlobalSettings.isDisableLoginForm;
+      $scope.isShowLoginAsLink = gnGlobalSettings.isShowLoginAsLink;
+      $scope.isUserProfileUpdateEnabled = gnGlobalSettings.isUserProfileUpdateEnabled;
+      $scope.isUserGroupUpdateEnabled = gnGlobalSettings.isUserGroupUpdateEnabled;
       $scope.isExternalViewerEnabled = gnExternalViewer.isEnabled();
       $scope.externalViewerUrl = gnExternalViewer.getBaseUrl();
 
+      $scope.isSelfRegisterPossible = function() {
+        return gnConfig['system.userSelfRegistration.enable'];
+      };
+
+      $scope.isHostDefined = function () {
+        return gnConfig['system.feedback.mailServer.hostIsDefined'];
+      };
 
       $scope.layout = {
         hideTopToolBar: false
@@ -695,6 +781,26 @@ goog.require('gn_alert');
                 '');
             return angular.isFunction(this[fnName]) ? this[fnName]() : this.isConnected();
           },
+          canImportMetadata: function () {
+            var profile = gnConfig['metadata.import.userprofile']
+                || 'Editor',
+              fnName = (profile !== '' ?
+                ('is' + profile[0].toUpperCase() + profile.substring(1) + 'OrMore') :
+                '');
+            return angular.isFunction(this[fnName]) ? this[fnName]() : false;
+          },
+          canDeletePublishedMetadata: function () {
+            var profile = gnConfig['metadata.delete.profilePublishedMetadata']
+                || 'Editor',
+              fnName = (profile !== '' ?
+                ('is' + profile[0].toUpperCase() + profile.substring(1) + 'OrMore') :
+                '');
+            return angular.isFunction(this[fnName]) ? this[fnName]() : false;
+          },
+
+          // The md provide the information about
+          // if the current user can edit records or not
+          // based on record operation allowed. See edit property.
           canEditRecord: function(md) {
             if (!md || this.isAnonymous()) {
               return false;

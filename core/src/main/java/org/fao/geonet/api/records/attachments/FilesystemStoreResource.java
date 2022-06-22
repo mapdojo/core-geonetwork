@@ -28,6 +28,7 @@ package org.fao.geonet.api.records.attachments;
 
 import com.google.common.net.UrlEscapers;
 import org.fao.geonet.domain.MetadataResource;
+import org.fao.geonet.domain.MetadataResourceExternalManagementProperties;
 import org.fao.geonet.domain.MetadataResourceVisibility;
 
 import java.util.Date;
@@ -45,6 +46,8 @@ public class FilesystemStoreResource implements MetadataResource {
     private final int metadataId;
     private final String metadataUuid;
     private final String filename;
+    private final String version;
+    private final MetadataResourceExternalManagementProperties metadataResourceExternalManagementProperties;
     private final boolean approved;
 
     public FilesystemStoreResource(String metadataUuid,
@@ -54,6 +57,8 @@ public class FilesystemStoreResource implements MetadataResource {
                                    MetadataResourceVisibility metadataResourceVisibility,
                                    long size,
                                    Date lastModification,
+                                   String version,
+                                   MetadataResourceExternalManagementProperties metadataResourceExternalManagementProperties,
                                    boolean approved) {
         this.metadataUuid = metadataUuid;
         this.metadataId = metadataId;
@@ -63,6 +68,19 @@ public class FilesystemStoreResource implements MetadataResource {
         this.metadataResourceVisibility = metadataResourceVisibility;
         this.size = size;
         this.lastModification = lastModification;
+        this.version=version;
+        this.metadataResourceExternalManagementProperties = metadataResourceExternalManagementProperties;
+    }
+
+    public FilesystemStoreResource(String metadataUuid,
+                                   int metadataId,
+                                   String filename,
+                                   String baseUrl,
+                                   MetadataResourceVisibility metadataResourceVisibility,
+                                   long size,
+                                   Date lastModification,
+                                   boolean approved) {
+        this(metadataUuid, metadataId, filename, baseUrl, metadataResourceVisibility, size, lastModification, null, null, approved);
     }
 
     @Override
@@ -112,6 +130,17 @@ public class FilesystemStoreResource implements MetadataResource {
     }
 
     @Override
+    public String getVersion() {
+        return version;
+    }
+
+    @Override
+    public MetadataResourceExternalManagementProperties getMetadataResourceExternalManagementProperties() {
+        return metadataResourceExternalManagementProperties;
+    }
+
+
+    @Override
     public String toString() {
         StringBuffer sb = new StringBuffer(this.getClass().getSimpleName());
         sb.append("\n");
@@ -122,6 +151,10 @@ public class FilesystemStoreResource implements MetadataResource {
         sb.append("Size: ").append(size).append("\n");
         sb.append("Last modification: ").append(lastModification).append("\n");
         sb.append("Approved: ").append(approved).append("\n");
+        sb.append("Version: ").append(version).append("\n");
+        sb.append("metadataResourceExternalManagementProperties.url: ").append(
+            (metadataResourceExternalManagementProperties==null?"":metadataResourceExternalManagementProperties .getUrl())
+        ).append("\n");
         return sb.toString();
     }
 }

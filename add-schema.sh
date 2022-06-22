@@ -7,14 +7,14 @@ function showUsage
   echo -e "Usage: ./`basename $0 $1` schema_name git_schema_repository git_schema_branch"
   echo
   echo -e "Example:"
-  echo -e "\t./`basename $0 $1` iso19139.ca.HNAP https://github.com/metadata101/iso19139.ca.HNAP 3.10.x"
+  echo -e "\t./`basename $0 $1` iso19139.ca.HNAP https://github.com/metadata101/iso19139.ca.HNAP 3.11.x"
   echo
 }
 
 if [ "$1" = "-h" ]
 then
-  showUsage
-  exit
+	showUsage
+	exit
 fi
 
 if [ $# -ne 3 ]
@@ -66,26 +66,74 @@ then
 SED_SCRIPT
 fi
 
+
 # Add schema dependency in web/pom.xml
 line=$(grep -n "schema-${schema}" web/pom.xml | cut -d: -f1)
 
 if [ ! -n "$line" ]
 then
-  line=$(grep -n 'schema-iso19139</artifactId>' web/pom.xml | cut -d: -f1)
-  insertLine=$(($line + 2))
-
-  projectGroupId='org.geonetwork-opensource.schemas'
   gnSchemasVersion='${project.version}'
+  basedir='${basedir}'
 
-  echo "Adding schema ${schema} dependency to web/pom.xml"
+  echo "Adding schema ${schema} dependency to web/pom.xml for schemaCopy"
 
+  line=$(grep -n '<!-- add schema_plugins -->' web/pom.xml | cut -d: -f1 | tail -1)
+  insertLine=$(($line))
   sed $sedopt -f /dev/stdin web/pom.xml << SED_SCRIPT
   ${insertLine} a\\
-\    <dependency>\\
-\      <groupId>${projectGroupId}</groupId>\\
-\      <artifactId>schema-${schema}</artifactId>\\
-\      <version>${gnSchemasVersion}</version>\\
-\    </dependency>
+\        <dependency>\\
+\          <groupId>org.geonetwork-opensource.schemas</groupId>\\
+\          <artifactId>schema-${schema}</artifactId>\\
+\          <version>${gnSchemasVersion}</version>\\
+\        </dependency>
+SED_SCRIPT
+
+  echo "Adding schema ${schema} dependency to web/pom.xml for schemaUnpack"
+
+  line=$(grep -n '</profiles>' web/pom.xml | cut -d: -f1)
+  insertLine=$(($line - 1))
+  sed $sedopt -f /dev/stdin web/pom.xml << SED_SCRIPT
+  ${insertLine} a\\
+\    <profile>\\
+\      <id>schema-${schema}</id>\\
+\      <activation>\\
+\        <property><name>schemasCopy</name><value>!true</value></property>\\
+\        <file><exists>../schemas/${schema}</exists></file>\\
+\      </activation>\\
+\      <dependencies>\\
+\        <dependency>\\
+\          <groupId>org.geonetwork-opensource.schemas</groupId>\\
+\          <artifactId>schema-${schema}</artifactId>\\
+\          <version>${gnSchemasVersion}</version>\\
+\        </dependency>\\
+\      </dependencies>\\
+\      <build>\\
+\        <plugins>\\
+\          <plugin>\\
+\            <groupId>org.apache.maven.plugins</groupId>\\
+\            <artifactId>maven-dependency-plugin</artifactId>\\
+\            <executions>\\
+\              <execution>\\
+\                <id>${schema}-resources</id>\\
+\                <phase>process-resources</phase>\\
+\                <goals><goal>unpack</goal></goals>\\
+\                <configuration>\\
+\                  <artifactItems>\\
+\                    <artifactItem>\\
+\                      <groupId>org.geonetwork-opensource.schemas</groupId>\\
+\                      <artifactId>schema-${schema}</artifactId>\\
+\                      <type>zip</type>\\
+\                      <overWrite>false</overWrite>\\
+\                      <outputDirectory>\$\{schema-plugins.dir\}</outputDirectory>\\
+\                    </artifactItem>\\
+\                  </artifactItems>\\
+\                </configuration>\\
+\              </execution>\\
+\            </executions>\\
+\          </plugin>\\
+\        </plugins>\\
+\      </build>\\
+\    </profile>
 SED_SCRIPT
 fi
 

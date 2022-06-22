@@ -291,6 +291,7 @@
           <Field name="geoDescCode" string="{string(.)}" store="true" index="true"/>
         </xsl:for-each>
 
+
         <xsl:for-each select="gmd:temporalElement/
                                   (gmd:EX_TemporalExtent|gmd:EX_SpatialTemporalExtent)/gmd:extent">
           <xsl:for-each select="gml:TimePeriod|gml320:TimePeriod">
@@ -309,6 +310,8 @@
             <Field name="tempExtentBegin" string="{lower-case(substring-before($times,'|'))}"
                    store="true" index="true"/>
             <Field name="tempExtentEnd" string="{lower-case(substring-after($times,'|'))}"
+                   store="true" index="true"/>
+            <Field name="tempExtentPeriod" string="{lower-case($times)}"
                    store="true" index="true"/>
           </xsl:for-each>
 
@@ -1149,7 +1152,7 @@
 
                   <xsl:choose>
                     <xsl:when test="not($existsLocally)">
-                      <xsl:variable name="datasetTitle" select="$remoteDoc//*[gmd:MD_DataIdentification or @gco:isoType='gmd:MD_DataIdentification']//gmd:citation//gmd:title/gco:CharacterString" />
+                      <xsl:variable name="datasetTitle" select="$remoteDoc//*[gmd:MD_DataIdentification or @gco:isoType='gmd:MD_DataIdentification']//gmd:citation/gmd:CI_Citation/gmd:title/gco:CharacterString" />
 
                       <xsl:variable name="datasetAbstract" select="$remoteDoc//*[gmd:MD_DataIdentification or @gco:isoType='gmd:MD_DataIdentification']//gmd:abstract/gco:CharacterString" />
 
@@ -1159,7 +1162,7 @@
                     <!-- Use the local info - can happen that the local copy is not the most updated ... -->
                     <xsl:otherwise>
 
-                      <xsl:variable name="datasetTitle" select="$remoteDoc//*[gmd:MD_DataIdentification or @gco:isoType='gmd:MD_DataIdentification']//gmd:citation//gmd:title/gco:CharacterString" />
+                      <xsl:variable name="datasetTitle" select="$remoteDoc//*[gmd:MD_DataIdentification or @gco:isoType='gmd:MD_DataIdentification']//gmd:citation/gmd:CI_Citation/gmd:title/gco:CharacterString" />
                       <xsl:variable name="datasetAbstract" select="$remoteDoc//*[gmd:MD_DataIdentification or @gco:isoType='gmd:MD_DataIdentification']//gmd:abstract/gco:CharacterString" />
 
                       <Field name="operatesOn" string="{concat($datasetUuid, '|L|', normalize-space($datasetTitle), '|', normalize-space($datasetAbstract), '|', $xlinkHref)}" store="true"

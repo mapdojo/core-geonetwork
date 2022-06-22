@@ -87,6 +87,7 @@ class Harvester implements IHarvester<HarvestResult> {
 
     private Logger log;
     private CswParams params;
+    /** Shared service context managed by HarvestManager */
     private ServiceContext context;
 
     /**
@@ -220,6 +221,7 @@ class Harvester implements IHarvester<HarvestResult> {
         return true;
     }
 
+
     /**
      * Does CSW GetRecordsRequest
      * @param server
@@ -237,6 +239,9 @@ class Harvester implements IHarvester<HarvestResult> {
 
         request.setResultType(ResultType.RESULTS);
         //request.setOutputSchema(OutputSchema.OGC_CORE);	// Use default value
+        if (StringUtils.isNotEmpty(params.sortBy)) {
+            request.addSortBy(params.sortBy);
+        }
         request.setElementSetName(ElementSetName.SUMMARY);
         request.setMaxRecords(GETRECORDS_REQUEST_MAXRECORDS);
         request.setDistribSearch(params.queryScope.equalsIgnoreCase("distributed"));

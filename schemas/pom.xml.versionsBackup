@@ -22,6 +22,7 @@
   ~ Rome - Italy. email: geonetwork@osgeo.org
   -->
 
+<<<<<<< HEAD:schemas/pom.xml.versionsBackup
 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -59,3 +60,23 @@
   </properties>
 
 </project>
+=======
+<beans
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xmlns="http://www.springframework.org/schema/beans"
+        xsi:schemaLocation="
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+    ">
+
+  <bean id="filesystemStore"
+        class="org.fao.geonet.api.records.attachments.FilesystemStore"/>
+
+  <bean id="resourceStore"
+        class="org.fao.geonet.api.records.attachments.ResourceLoggerStore">
+    <constructor-arg index="0" ref="filesystemStore"/>
+  </bean>
+
+  <bean id="resources" class="org.fao.geonet.resources.FileResources"/>
+
+</beans>
+>>>>>>> 26b88ea449d3ce36893c1232901be5a9aa4b7688:core/src/main/resources/config-store/config-default.xml

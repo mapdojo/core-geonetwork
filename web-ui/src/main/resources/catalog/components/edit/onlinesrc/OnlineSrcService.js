@@ -1,4 +1,4 @@
-/*
+ /*
  * Copyright (C) 2001-2016 Food and Agriculture Organization of the
  * United Nations (FAO-UN), United Nations World Food Programme (WFP)
  * and United Nations Environment Programme (UNEP)
@@ -49,12 +49,16 @@
     'gnCurrentEdit',
     '$q',
     '$http',
+    '$window',
     '$rootScope',
     '$translate',
     '$filter',
     'Metadata',
+    'gnUrlUtils',
+    'gnGlobalSettings',
     function(gnBatchProcessing, gnHttp, gnEditor, gnCurrentEdit,
-             $q, $http, $rootScope, $translate, $filter, Metadata) {
+             $q, $http, $window, $rootScope, $translate, $filter, Metadata,
+             gnUrlUtils, gnGlobalSettings) {
 
       var reload = false;
       var openCb = {};
@@ -111,20 +115,32 @@
         if (angular.isArray(params.selectedLayers) &&
             params.selectedLayers.length > 0) {
           var names = [],
-              descs = [];
+            descs = [];
 
           angular.forEach(params.selectedLayers, function(layer) {
             names.push(layer.Name || layer.name);
             descs.push(layer.Title || layer.title);
           });
 
-          angular.extend(params, {
-            name: names.join(','),
-            desc: descs.join(',')
-          });
+          var addLayersInUrl = params.addLayersInUrl;
+
+          if ((addLayersInUrl != '') && (params.protocol.indexOf('OGC:WMS') >= 0)) {
+            params.url = gnUrlUtils.remove(params.url, [addLayersInUrl], true);
+            params.url = gnUrlUtils.append(params.url, addLayersInUrl + '=' + names.join(','));
+          }
+
+          if (params.wmsResources.addLayerNamesMode == "resourcename") {
+            angular.extend(params, {
+              name: names.join(','),
+              desc: descs.join(',')
+            });
+          }
         }
+
         delete params.layers;
         delete params.selectedLayers;
+        delete params.wmsResources;
+        delete params.addLayersInUrl;
         return params;
       };
 
@@ -285,6 +301,50 @@
           } else {
             console.warn('No callback functions available for \'' + type +
                 '\'. Check the type value.');
+          }
+        },
+
+        /**
+         * @ngdoc method
+         * @methodOf gn_onlinesrc.service:gnOnlinesrc
+         * @name gnOnlinesrc#openExternalResourceManagement
+         *
+         * @description
+         * Open open external resource management popup
+         * function (from the directive).
+         *
+         * @param {r} MetadataResource
+         * @param {$window} window object
+         */
+        openExternalResourceManagement: function(r, $window) {
+          try {
+            var url = r.metadataResourceExternalManagementProperties.url;
+          } catch (e) {
+            console.log("external management url not defined")
+            return
+          }
+
+          var modal = gnCurrentEdit.resourceManagementExternalProperties.modal;
+          var externalManagementWindowsParameters = gnCurrentEdit.resourceManagementExternalProperties.windowParameters;
+
+          var win = window.open(url, "_blank", externalManagementWindowsParameters)
+
+          if (modal) {
+            var ZIndex = $('.modal').css("z-index");
+            $('.modal').css("z-index", 0);
+            var timer = setInterval(function () {
+              if (win.closed) {
+                clearInterval(timer);
+                $('.modal').css("z-index", ZIndex);
+                $rootScope.$broadcast('gnFileStoreUploadDone');
+              } else {
+                // whenever user comes back to the browser window give them focus on the popup.
+                // This will simulat a modal
+                if (document.hasFocus()) {
+                  win.focus()
+                }
+              }
+            }, 250);
           }
         },
 

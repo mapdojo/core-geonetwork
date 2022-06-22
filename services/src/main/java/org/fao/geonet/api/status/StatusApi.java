@@ -69,8 +69,9 @@ public class StatusApi {
     @ResponseStatus(value = HttpStatus.OK)
     @ResponseBody
     public List<StatusValue> getStatus(HttpServletRequest request) throws Exception {
-        ServiceContext context = ApiUtils.createServiceContext(request);
+      try (ServiceContext context = ApiUtils.createServiceContext(request)) {
         return statusValueRepository.findAll();
+      }
     }
 
 
@@ -81,8 +82,22 @@ public class StatusApi {
     public List<StatusValue> getStatusByType(
             @ApiParam(value = "Type", required = true) @PathVariable StatusValueType type, HttpServletRequest request)
             throws Exception {
-        ServiceContext context = ApiUtils.createServiceContext(request);
+      try (ServiceContext context = ApiUtils.createServiceContext(request)) {
         return statusValueRepository.findAllByType(type);
+      }
+    }
+
+    @ApiOperation(value = "Delete all record history and status", notes = "", nickname = "deleteAllHistoryAndStatus")
+    @RequestMapping(method = RequestMethod.DELETE)
+    @PreAuthorize("hasRole('Administrator')")
+    @ApiResponses(value = {
+        @ApiResponse(code = 204, message = "Status removed."),
+        @ApiResponse(code = 403, message = ApiParams.API_RESPONSE_NOT_ALLOWED_ONLY_ADMIN)
+    })
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAllHistoryAndStatus(
+        HttpServletRequest request) throws Exception {
+        metadataStatusRepository.deleteAll();
     }
 
     @ApiOperation(value = "Delete all record history and status", notes = "", nickname = "deleteAllHistoryAndStatus")

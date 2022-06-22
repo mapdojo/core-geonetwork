@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2016 Food and Agriculture Organization of the
+ * Copyright (C) 2001-2021 Food and Agriculture Organization of the
  * United Nations (FAO-UN), United Nations World Food Programme (WFP)
  * and United Nations Environment Programme (UNEP)
  *
@@ -23,22 +23,25 @@
 
 package org.fao.geonet.api.userfeedback;
 
-import static org.apache.commons.lang.StringUtils.isNotBlank;
 import static org.fao.geonet.kernel.setting.Settings.SYSTEM_FEEDBACK_EMAIL;
 import static org.fao.geonet.kernel.setting.Settings.SYSTEM_SITE_NAME_PATH;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
+import jeeves.server.context.ServiceContext;
+import org.apache.commons.lang.StringUtils;
 import org.apache.jcs.access.exception.ObjectNotFoundException;
 import org.fao.geonet.ApplicationContextHolder;
 import org.fao.geonet.api.API;
@@ -48,7 +51,6 @@ import org.fao.geonet.api.tools.i18n.LanguageUtils;
 import org.fao.geonet.api.userfeedback.UserFeedbackUtils.RatingAverage;
 import org.fao.geonet.api.userfeedback.service.IUserFeedbackService;
 import org.fao.geonet.api.users.recaptcha.RecaptchaChecker;
-import org.fao.geonet.constants.Geonet;
 import org.fao.geonet.domain.AbstractMetadata;
 import org.fao.geonet.domain.userfeedback.RatingCriteria;
 import org.fao.geonet.domain.userfeedback.RatingsSetting;
@@ -197,18 +199,17 @@ public class UserFeedbackAPI {
         @ApiIgnore final HttpServletResponse response,
         @ApiIgnore final HttpSession httpSession) {
 
-        final String functionEnabled = settingManager.getValue(Settings.SYSTEM_LOCALRATING_ENABLE);
+        try (ServiceContext context = ApiUtils.createServiceContext(request)) {
+            final String functionEnabled = settingManager.getValue(Settings.SYSTEM_LOCALRATING_ENABLE);
 
-        if (!functionEnabled.equals(RatingsSetting.ADVANCED)) {
-            response.setStatus(HttpStatus.FORBIDDEN.value());
-            return null;
-        }
-
-        try {
+            if (!functionEnabled.equals(RatingsSetting.ADVANCED)) {
+                response.setStatus(HttpStatus.FORBIDDEN.value());
+                return null;
+            }
             Log.debug("org.fao.geonet.api.userfeedback.UserFeedback", "getMetadataUserComments");
 
             // Check permission for metadata
-            final AbstractMetadata metadata = ApiUtils.canViewRecord(metadataUuid, request);
+            final AbstractMetadata metadata = ApiUtils.canViewRecord(metadataUuid, context);
             if (metadata == null) {
                 printOutputMessage(response, HttpStatus.FORBIDDEN, ApiParams.API_RESPONSE_NOT_ALLOWED_CAN_VIEW);
                 return null;
@@ -261,6 +262,7 @@ public class UserFeedbackAPI {
           @ApiIgnore final HttpSession httpSession)
             throws Exception {
 
+      try (ServiceContext context = ApiUtils.createServiceContext(request)) {
         final String functionEnabled = settingManager.getValue(Settings.SYSTEM_LOCALRATING_ENABLE);
 
         if (!functionEnabled.equals(RatingsSetting.ADVANCED)) {
@@ -292,13 +294,13 @@ public class UserFeedbackAPI {
         }
 
         // Check permission for metadata
-        final AbstractMetadata metadata = ApiUtils.canViewRecord(userfeedback.getMetadata().getUuid(), request);
+        final AbstractMetadata metadata = ApiUtils.canViewRecord(userfeedback.getMetadata().getUuid(), context);
         if (metadata == null) {
             printOutputMessage(response, HttpStatus.FORBIDDEN, ApiParams.API_RESPONSE_NOT_ALLOWED_CAN_VIEW);
             return null;
         }
-
         return dto;
+      }
     }
 
     /**
@@ -335,10 +337,13 @@ public class UserFeedbackAPI {
             required = false
         )
         int size,
+        @ApiIgnore final HttpServletRequest request,
         @ApiIgnore final HttpServletResponse response,
         @ApiIgnore final HttpSession httpSession) throws Exception {
 
-        return getUserFeedback(metadataUuid, size, response, httpSession);
+        try (ServiceContext context = ApiUtils.createServiceContext(request)) {
+            return getUserFeedback(metadataUuid, size, response, httpSession);
+        }
     }
 
     /**
@@ -378,10 +383,13 @@ public class UserFeedbackAPI {
             required = false
         )
         int size,
+        @ApiIgnore final HttpServletRequest request,
         @ApiIgnore final HttpServletResponse response,
         @ApiIgnore final HttpSession httpSession) throws Exception {
 
-        return getUserFeedback(metadataUuid, size, response, httpSession);
+        try (ServiceContext context = ApiUtils.createServiceContext(request)) {
+            return getUserFeedback(metadataUuid, size, response, httpSession);
+        }
     }
 
     private List<UserFeedbackDTO> getUserFeedback(
@@ -506,7 +514,7 @@ public class UserFeedbackAPI {
         method = RequestMethod.POST)
     @ResponseStatus(HttpStatus.CREATED)
     @ResponseBody
-    public ResponseEntity sendEmailToContact(
+    public ResponseEntity<String> sendEmailToContact(
         @ApiParam(
             value = "Metadata record UUID.",
             required = true
@@ -596,24 +604,26 @@ public class UserFeedbackAPI {
             }
         }
 
-
-
         String to = settingManager.getValue(SYSTEM_FEEDBACK_EMAIL);
         String catalogueName = settingManager.getValue(SYSTEM_SITE_NAME_PATH);
 
-        List<String> toAddress = new LinkedList<String>();
+        Set<String> toAddress = new HashSet<>();
         toAddress.add(to);
-        if (isNotBlank(metadataEmail)) {
+        if (StringUtils.isNotBlank(metadataEmail)) {
             //Check metadata email belongs to metadata security!!
             AbstractMetadata md = metadataRepository.findOneByUuid(metadataUuid);
-            if(md.getData().indexOf(metadataEmail) > 0) {
-                toAddress.add(metadataEmail);
+            String[] metadataAddresses = StringUtils.split(metadataEmail, ",");
+            for (String metadataAddress : metadataAddresses) {
+                String cleanMetadataAddress = StringUtils.trimToEmpty(metadataAddress);
+                if (cleanMetadataAddress.length() > 0 && md.getData().indexOf(cleanMetadataAddress) > 0) {
+                    toAddress.add(cleanMetadataAddress);
+                }
             }
         }
 
         String title = XslUtil.getIndexField(null, metadataUuid, "title", "");
 
-        MailUtil.sendMail(toAddress,
+        MailUtil.sendMail(new ArrayList<>(toAddress),
             String.format(
                 messages.getString("user_feedback_title"),
                 catalogueName, title, subject),
@@ -623,7 +633,7 @@ public class UserFeedbackAPI {
                 settingManager.getNodeURL(), metadataUuid),
             settingManager);
 
-        return new ResponseEntity(HttpStatus.CREATED);
+        return new ResponseEntity<>(HttpStatus.CREATED);
     }
 
     /**

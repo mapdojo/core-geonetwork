@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2016 Food and Agriculture Organization of the
+ * Copyright (C) 2001-2022 Food and Agriculture Organization of the
  * United Nations (FAO-UN), United Nations World Food Programme (WFP)
  * and United Nations Environment Programme (UNEP)
  *
@@ -25,12 +25,7 @@ package org.fao.geonet.api.groups;
 
 import com.google.common.base.Functions;
 import com.google.common.collect.Lists;
-import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiOperation;
-import io.swagger.annotations.ApiParam;
-import io.swagger.annotations.ApiResponse;
-import io.swagger.annotations.ApiResponses;
-import io.swagger.annotations.Authorization;
+import io.swagger.annotations.*;
 import jeeves.server.UserSession;
 import jeeves.server.context.ServiceContext;
 import org.apache.commons.io.FileUtils;
@@ -45,23 +40,11 @@ import org.fao.geonet.api.exception.ResourceNotFoundException;
 import org.fao.geonet.api.records.attachments.AttachmentsApi;
 import org.fao.geonet.api.tools.i18n.LanguageUtils;
 import org.fao.geonet.constants.Geonet;
-import org.fao.geonet.domain.Group;
-import org.fao.geonet.domain.Group_;
-import org.fao.geonet.domain.Language;
-import org.fao.geonet.domain.OperationAllowedId_;
-import org.fao.geonet.domain.Profile;
-import org.fao.geonet.domain.ReservedGroup;
-import org.fao.geonet.domain.User;
-import org.fao.geonet.domain.UserGroup;
-import org.fao.geonet.domain.UserGroupId_;
+import org.fao.geonet.domain.*;
 import org.fao.geonet.kernel.DataManager;
-import org.fao.geonet.repository.GroupRepository;
-import org.fao.geonet.repository.LanguageRepository;
-import org.fao.geonet.repository.OperationAllowedRepository;
-import org.fao.geonet.repository.SortUtils;
-import org.fao.geonet.repository.UserGroupRepository;
-import org.fao.geonet.repository.UserRepository;
+import org.fao.geonet.repository.*;
 import org.fao.geonet.repository.specification.GroupSpecs;
+import org.fao.geonet.repository.specification.MetadataSpecs;
 import org.fao.geonet.repository.specification.OperationAllowedSpecs;
 import org.fao.geonet.repository.specification.UserGroupSpecs;
 import org.fao.geonet.resources.Resources;
@@ -71,19 +54,14 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.domain.Specifications;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.context.request.WebRequest;
 import springfox.documentation.annotations.ApiIgnore;
 
@@ -96,12 +74,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static org.springframework.data.jpa.domain.Specifications.where;
 
@@ -115,6 +88,12 @@ import static org.springframework.data.jpa.domain.Specifications.where;
     description = "Groups operations")
 @Controller("groups")
 public class GroupsApi {
+    /**
+     * Group name pattern with allowed chars. Group name may only contain alphanumeric characters or single hyphens.
+     * Cannot begin or end with a hyphen.
+     */
+    private static final String GROUPNAME_PATTERN = "^[a-zA-Z0-9]+([-_]?[a-zA-Z0-9]+)*$";
+
     /**
      * API logo note.
      */
@@ -195,51 +174,52 @@ public class GroupsApi {
         Locale locale = languageUtils.parseAcceptLanguage(request.getLocales());
 
         ApplicationContext context = ApplicationContextHolder.get();
-        ServiceContext serviceContext = ApiUtils.createServiceContext(request, locale.getISO3Country());
-        if (context == null) {
-            throw new RuntimeException("ServiceContext not available");
-        }
+        try (ServiceContext serviceContext = ApiUtils.createServiceContext(request, locale.getISO3Country())) {
+            if (context == null) {
+                throw new RuntimeException("ServiceContext not available");
+            }
 
-        Group group = groupRepository.findOne(groupId);
-        if (group == null) {
-            throw new ResourceNotFoundException(messages.getMessage("api.groups.group_not_found", new
-                Object[]{groupId}, locale));
-        }
-        try {
-            final Resources resources = context.getBean(Resources.class);
-            final String logoUUID = group.getLogo();
-            if (StringUtils.isNotBlank(logoUUID) && !logoUUID.startsWith("http://") && !logoUUID.startsWith("https//")) {
-                try (Resources.ResourceHolder image = getImage(resources, serviceContext, group)){
-                    if (image != null) {
-                        FileTime lastModifiedTime = image.getLastModifiedTime();
-                        response.setDateHeader("Expires", System.currentTimeMillis() + SIX_HOURS * 1000L);
-                        if (webRequest.checkNotModified(lastModifiedTime.toMillis())) {
-                            // webRequest.checkNotModified sets the right HTTP headers
+            Group group = groupRepository.findOne(groupId);
+            if (group == null) {
+                throw new ResourceNotFoundException(messages.getMessage("api.groups.group_not_found", new
+                    Object[]{groupId}, locale));
+            }
+            try {
+                final Resources resources = context.getBean(Resources.class);
+                final String logoUUID = group.getLogo();
+                if (StringUtils.isNotBlank(logoUUID) && !logoUUID.startsWith("http://") && !logoUUID.startsWith("https//")) {
+                    try (Resources.ResourceHolder image = getImage(resources, serviceContext, group)){
+                        if (image != null) {
+                            FileTime lastModifiedTime = image.getLastModifiedTime();
+                            response.setDateHeader("Expires", System.currentTimeMillis() + SIX_HOURS * 1000L);
+                            if (webRequest.checkNotModified(lastModifiedTime.toMillis())) {
+                                // webRequest.checkNotModified sets the right HTTP headers
+                                return;
+                            }
+                            response.setContentType(AttachmentsApi.getFileContentType(image.getPath()));
+                            response.setContentLength((int) Files.size(image.getPath()));
+                            response.addHeader("Cache-Control", "max-age=" + SIX_HOURS + ", public");
+                            FileUtils.copyFile(image.getPath().toFile(), response.getOutputStream());
                             return;
                         }
-                        response.setContentType(AttachmentsApi.getFileContentType(image.getPath()));
-                        response.setContentLength((int) Files.size(image.getPath()));
-                        response.addHeader("Cache-Control", "max-age=" + SIX_HOURS + ", public");
-                        FileUtils.copyFile(image.getPath().toFile(), response.getOutputStream());
-                        return;
                     }
                 }
-            }
 
-            // no logo image found. Return a transparent 1x1 png
-            FileTime lastModifiedTime = FileTime.fromMillis(0);
-            if (webRequest.checkNotModified(lastModifiedTime.toMillis())) {
-                return;
-            }
-            response.setContentType("image/png");
-            response.setContentLength(TRANSPARENT_1_X_1_PNG.length);
-            response.addHeader("Cache-Control", "max-age=" + SIX_HOURS + ", public");
-            response.getOutputStream().write(TRANSPARENT_1_X_1_PNG);
+                // no logo image found. Return a transparent 1x1 png
+                FileTime lastModifiedTime = FileTime.fromMillis(0);
+                if (webRequest.checkNotModified(lastModifiedTime.toMillis())) {
+                    return;
+                }
+                response.setContentType("image/png");
+                response.setContentLength(TRANSPARENT_1_X_1_PNG.length);
+                response.addHeader("Cache-Control", "max-age=" + SIX_HOURS + ", public");
+                response.getOutputStream().write(TRANSPARENT_1_X_1_PNG);
 
-        } catch (IOException e) {
-            Log.error(LOGGER, String.format("There was an error accessing the logo of the group with id '%d'",
-                groupId));
-            throw new RuntimeException(e);
+            } catch (IOException e) {
+                Log.error(LOGGER, String.format("There was an error accessing the logo of the group with id '%d'",
+                    groupId));
+                throw new RuntimeException(e);
+            }
         }
     }
 
@@ -350,6 +330,12 @@ public class GroupsApi {
                 "A group with name '%s' already exist.",
                 group.getName()
             ));
+        }
+
+        if (!group.getName().matches(GROUPNAME_PATTERN)) {
+            throw new IllegalArgumentException("Group name may only contain alphanumeric characters "
+                + "or single hyphens. Cannot begin or end with a hyphen."
+            );
         }
 
         // Populate languages if not already set
@@ -479,6 +465,12 @@ public class GroupsApi {
                 MSG_GROUP_WITH_IDENTIFIER_NOT_FOUND, groupIdentifier
             ));
         } else {
+            if (!group.getName().matches(GROUPNAME_PATTERN)) {
+                throw new IllegalArgumentException("Group name may only contain alphanumeric characters "
+                    + "or single hyphens. Cannot begin or end with a hyphen."
+                );
+            }
+
             try {
                 groupRepository.saveAndFlush(group);
             } catch (Exception ex) {
@@ -496,6 +488,9 @@ public class GroupsApi {
 
     @Autowired
     private DataManager dm;
+
+    @Autowired
+    private MetadataRepository metadataRepository;
 
     @ApiOperation(
         value = "Remove a group",
@@ -533,6 +528,16 @@ public class GroupsApi {
         Group group = groupRepository.findOne(groupIdentifier);
 
         if (group != null) {
+
+            final long metadataCount = metadataRepository.count(where((Specification<Metadata>)
+                MetadataSpecs.isOwnedByOneOfFollowingGroups(Arrays.asList(group.getId()))));
+            if (metadataCount > 0) {
+                throw new NotAllowedException(String.format(
+                    "Group %s owns metadata. To remove the group you should transfer first the metadata to another group.",
+                    group.getName()
+                ));
+            }
+
             List<Integer> reindex = operationAllowedRepo.findAllIds(OperationAllowedSpecs.hasGroupId(groupIdentifier),
                 OperationAllowedId_.metadataId);
 

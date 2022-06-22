@@ -98,8 +98,8 @@ public class Set {
     ) throws Exception {
 
         ServiceManager serviceManager = ApplicationContextHolder.get().getBean(ServiceManager.class);
-        ServiceContext context = serviceManager.createServiceContext("md.thumbnail.upload", lang, request);
-
+        // This is an example of a ServiceContext used as a parameter, and not being assigned to the current thread
+      try (ServiceContext context = serviceManager.createServiceContext("md.thumbnail.upload", lang, request)) {
         Lib.resource.checkEditPrivilege(context, id);
 
         //-----------------------------------------------------------------------
@@ -149,6 +149,7 @@ public class Set {
         dataMan.indexMetadata(id, true, null);
 
         return new Response(id, dataMan.getNewVersion(id));
+      }
     }
 
     // FIXME : not elegant

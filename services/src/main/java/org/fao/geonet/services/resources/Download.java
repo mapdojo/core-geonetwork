@@ -90,9 +90,9 @@ public class Download {
         }
 
         final HttpServletRequest httpServletRequest = request.getNativeRequest(HttpServletRequest.class);
-        final ServiceContext context = serviceManager.createServiceContext("resources.get", lang, httpServletRequest);
         boolean doNotify = false;
 
+      try (ServiceContext context = serviceManager.createServiceContext("resources.get", lang, httpServletRequest)) {
         FilePathChecker.verify(fname);
 
 		if (access.equals(Params.Access.PRIVATE))
@@ -172,6 +172,7 @@ public class Download {
             IResourceDownloadHandler downloadHook = (IResourceDownloadHandler) context.getApplicationContext().getBean("resourceDownloadHandler");
             return downloadHook.onDownload(context, request, Integer.parseInt(id), fname, file);
         }
+      }
     }
 }
 

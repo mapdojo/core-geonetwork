@@ -104,8 +104,7 @@ public class AtomPredefinedFeed {
             @RequestParam(value = "language", required = false) String language,
             NativeWebRequest webRequest) throws Exception {
 
-        ServiceContext context = createServiceContext(Geonet.DEFAULT_LANGUAGE, webRequest.getNativeRequest(HttpServletRequest.class));
-
+      try (ServiceContext context = createServiceContext(Geonet.DEFAULT_LANGUAGE, webRequest.getNativeRequest(HttpServletRequest.class))) {
         SettingManager sm = context.getBean(SettingManager.class);
         boolean inspireEnable = sm.getValueAsBool(Settings.SYSTEM_INSPIRE_ENABLE);
         if (!inspireEnable) {
@@ -115,6 +114,7 @@ public class AtomPredefinedFeed {
 
         Element feed = getServiceFeed(context, uuid, language);
         return writeOutResponse(Xml.getString(feed),"application", "atom+xml");
+      }
     }
 
     /**
@@ -137,8 +137,7 @@ public class AtomPredefinedFeed {
             @RequestParam(value = "q", required = false) String searchTerms,
             NativeWebRequest webRequest) throws Exception
     {
-        ServiceContext context = createServiceContext("eng", webRequest.getNativeRequest(HttpServletRequest.class));
-
+      try (ServiceContext context = createServiceContext("eng", webRequest.getNativeRequest(HttpServletRequest.class))) {
         SettingManager sm = context.getBean(SettingManager.class);
         boolean inspireEnable = sm.getValueAsBool(Settings.SYSTEM_INSPIRE_ENABLE);
         if (!inspireEnable) {
@@ -152,6 +151,7 @@ public class AtomPredefinedFeed {
         }
         Element feed = InspireAtomUtil.getDatasetFeed(context, spIdentifier, spNamespace, params, language);
         return writeOutResponse(Xml.getString(feed), "application", "atom+xml");
+      }
     }
 
     private Element getServiceFeed(ServiceContext context, final String uuid, final String language) throws Exception {
@@ -204,6 +204,15 @@ public class AtomPredefinedFeed {
         return params;
     }
 
+    /**
+     * Service context for atom.service.
+     *
+     * When creating a new service context you are responsible for thread local management and any cleanup.
+     *
+     * @param lang
+     * @param request
+     * @return service context for atom.service
+     */
     private ServiceContext createServiceContext(String lang, HttpServletRequest request) {
         final ServiceManager serviceManager = ApplicationContextHolder.get().getBean(ServiceManager.class);
         return serviceManager.createServiceContext("atom.service", lang, request);
@@ -228,7 +237,7 @@ public class AtomPredefinedFeed {
      * @param language the language to be used for translation of title, etc. in the resulting dataset ATOM feed
      * @param q the searchTerms for filtering of the spatial datasets
      * @param webRequest the request object
-     * @return
+     * @return atom feed
      * @throws Exception
      */
     @RequestMapping(value = "/" + InspireAtomUtil.LOCAL_DOWNLOAD_DATASET_URL_SUFFIX)
@@ -241,8 +250,7 @@ public class AtomPredefinedFeed {
             @RequestParam(value = "q", required = false) String searchTerms,
             NativeWebRequest webRequest) throws Exception
     {
-        ServiceContext context = createServiceContext(Geonet.DEFAULT_LANGUAGE, webRequest.getNativeRequest(HttpServletRequest.class));
-
+      try (ServiceContext context = createServiceContext(Geonet.DEFAULT_LANGUAGE, webRequest.getNativeRequest(HttpServletRequest.class))) {
         SettingManager sm = context.getBean(SettingManager.class);
         boolean inspireEnable = sm.getValueAsBool(Settings.SYSTEM_INSPIRE_ENABLE);
         if (!inspireEnable) {
@@ -293,6 +301,7 @@ public class AtomPredefinedFeed {
             InspireAtomUtil.filterDatasetFeedByCrs(feed, crs);
             return writeOutResponse(Xml.getString(feed),"application", "atom+xml");
         }
+      }
     }
 
     private HttpEntity<byte[]> redirectResponse(String location) throws Exception {
@@ -337,8 +346,7 @@ public class AtomPredefinedFeed {
             @RequestParam(value = "language", required = false) String language,
             NativeWebRequest webRequest) throws Exception {
 
-        ServiceContext context = createServiceContext(Geonet.DEFAULT_LANGUAGE, webRequest.getNativeRequest(HttpServletRequest.class));
-
+      try (ServiceContext context = createServiceContext(Geonet.DEFAULT_LANGUAGE, webRequest.getNativeRequest(HttpServletRequest.class))) {
         SettingManager sm = context.getBean(SettingManager.class);
         boolean inspireEnable = sm.getValueAsBool(Settings.SYSTEM_INSPIRE_ENABLE);
         if (!inspireEnable) {
@@ -348,6 +356,7 @@ public class AtomPredefinedFeed {
 
         Element description = getOpenSearchDescription(context, uuid);
         return writeOutResponse(Xml.getString(description), "application", "opensearchdescription+xml");
+      }
     }
 
     private Element getOpenSearchDescription(ServiceContext context, final String uuid) throws Exception {

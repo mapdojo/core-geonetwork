@@ -266,19 +266,52 @@
         <value>WEB-INF/classes/setup/sql/migrate/v3104/migrate-</value>
       </list>
     </entry>
-    <entry key="3.10.5">
+    <entry key="3.11.0">
       <list>
-        <value>WEB-INF/classes/setup/sql/migrate/v3105/migrate-</value>
+        <value>java:v3110.UpdateMetadataStatus</value>
+        <value>WEB-INF/classes/setup/sql/migrate/v3110/migrate-</value>
+        <value>java:v3110.MigrateEncryptor</value>
+        <value>java:v3110.UpdateUISettingsMigration</value>
       </list>
     </entry>
-    <entry key="3.10.6">
+    <entry key="3.12.0">
       <list>
-        <value>WEB-INF/classes/setup/sql/migrate/v3106/migrate-</value>
+        <value>WEB-INF/classes/setup/sql/migrate/v3120/migrate-</value>
       </list>
     </entry>
-    <entry key="3.10.7">
+    <entry key="3.12.1">
       <list>
-        <value>WEB-INF/classes/setup/sql/migrate/v3107/migrate-</value>
+        <value>WEB-INF/classes/setup/sql/migrate/v3121/migrate-</value>
+      </list>
+    </entry>
+    <entry key="3.12.2">
+      <list>
+        <value>WEB-INF/classes/setup/sql/migrate/v3122/migrate-</value>
+      </list>
+    </entry>
+    <entry key="3.12.3">
+      <list>
+        <value>WEB-INF/classes/setup/sql/migrate/v3123/migrate-</value>
+      </list>
+    </entry>
+    <entry key="3.12.4">
+      <list>
+        <value>WEB-INF/classes/setup/sql/migrate/v3124/migrate-</value>
+      </list>
+    </entry>
+    <entry key="3.12.5">
+      <list>
+        <value>WEB-INF/classes/setup/sql/migrate/v3125/migrate-</value>
+      </list>
+    </entry>
+    <entry key="3.12.6">
+      <list>
+        <value>WEB-INF/classes/setup/sql/migrate/v3126/migrate-</value>
+      </list>
+    </entry>
+    <entry key="3.12.7">
+      <list>
+        <value>WEB-INF/classes/setup/sql/migrate/v3127/migrate-</value>
       </list>
     </entry>
   </util:map>

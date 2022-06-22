@@ -30,6 +30,7 @@
                        aria-label="{{'anyPlaceHolder' | translate}}"
                        data-typeahead="address for address in getAnySuggestions($viewValue)"
                        data-typeahead-loading="anyLoading" class="form-control"
+                       data-typeahead-template-url="../../catalog/templates/gn-typeahead-match.html"
                        data-typeahead-min-length="1">
                 <div class="input-group-btn">
                   <button type="button"
@@ -52,7 +53,10 @@
                 <a href="#/create" class="btn btn-primary btn-truncate" title="{{'addRecord' | translate}}">
                   <i class="fa fa-fw fa-plus"/><span class=" hidden-sm" data-translate="">addRecord</span>
                 </a>
-                <a href="#/import" class="btn btn-default btn-truncate" title="{{'ImportRecord' | translate}}">
+                <a href="#/import"
+                     data-ng-if="user.canImportMetadata()"
+                     class="btn btn-default btn-truncate"
+                     title="{{'ImportRecord' | translate}}">
                   <i class="fa fa-fw fa-upload"/><span class="hidden-xs hidden-sm" data-translate="">ImportRecord</span>
                 </a>
                 <a href="#/directory" class="btn btn-default btn-truncate" title="{{'directoryManager' | translate}}"

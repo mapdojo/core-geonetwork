@@ -30,6 +30,8 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import java.util.Collection;
 
@@ -64,12 +66,10 @@ public class TransactionManager {
                                          boolean readOnly,
                                          final TransactionTask<V> action) {
         final PlatformTransactionManager transactionManager = context.getBean(PlatformTransactionManager.class);
-        final Throwable[] exception = new Throwable[1];
         TransactionStatus status = null;
         boolean isNewTransaction = false;
         boolean isRolledBack = false;
         boolean isCommitted = false;
-        V result = null;
         try {
             DefaultTransactionDefinition definition = new DefaultTransactionDefinition(transactionRequirement.propagationId);
             definition.setName(name);
@@ -87,69 +87,52 @@ public class TransactionManager {
                 }
             }
 
-            result = action.doInTransaction(status);
+            return action.doInTransaction(status);
 
-        } catch (Throwable e) {
-            Log.error(Log.JEEVES, "Error occurred within a transaction", e);
-            if (exception[0] == null) {
-                exception[0] = e;
-            }
-
-            try {
-                doRollback(context, transactionManager, status);
-            }
-            finally {
-                isRolledBack = true;
+        } catch (Throwable exception) {
+            Log.error(Log.JEEVES, "Error occurred within a transaction", exception);
+            isRolledBack = rollbackIfNotRolledBack(context, transactionManager, status, isRolledBack);
+            if (exception instanceof RuntimeException) {
+                throw (RuntimeException) exception;
+            } else if (exception instanceof Error) {
+                throw (Error) exception;
+            } else {
+                throw new RuntimeException("Run in transaction '"+action+"': "+exception.getLocalizedMessage(), exception);
             }
         } finally {
             try {
-                if (readOnly && !isRolledBack) {
-                    try {
-                        doRollback(context, transactionManager, status);
-                    }
-                    finally {
-                        isRolledBack = true;
-                    }
-                } else if (!isRolledBack && (isNewTransaction || commitBehavior == CommitBehavior.ALWAYS_COMMIT)) {
-                    try {
+                // GlobalExceptionManager stores the exception in a request attribute, to be processed to rollback the transaction
+                // as otherwise GlobalExceptionManager processes the exception and the code doesn't enter in the catch block
+                // to rollback the transaction
+                Throwable requestException = null;
+                try {
+                    requestException = (Throwable) RequestContextHolder.currentRequestAttributes().getAttribute("exception", RequestAttributes.SCOPE_REQUEST);
+                } catch (IllegalStateException ex) {
+                    // Ignore: transaction non-related to a web request
+                }
+
+                if (requestException != null) {
+                    isRolledBack = rollbackIfNotRolledBack(context, transactionManager, status, isRolledBack);
+                } else {
+                    if (readOnly) {
+                        isRolledBack = rollbackIfNotRolledBack(context, transactionManager, status, isRolledBack);
+                    } else if (!isRolledBack && (isNewTransaction || commitBehavior == CommitBehavior.ALWAYS_COMMIT)) {
                         doCommit(context, transactionManager, status);
-                    }
-                    finally {
                         isCommitted = true;
                     }
+
                 }
             } catch (TransactionSystemException e) {
                 if (!(e.getOriginalException() instanceof RollbackException)) {
-                    Log.error(Log.JEEVES, "ERROR committing transaction, will try to rollback", e);
-                    if (!isRolledBack) {
-                        try {
-                            doRollback(context, transactionManager, status);
-                        }
-                        finally {
-                            isRolledBack = true;
-                        }
-                    }
+                    Log.error(Log.JEEVES, "Exception completing transaction rollback, will try to rollback", e);
                 } else {
-                    Log.debug(Log.JEEVES, "ERROR committing transaction, will try to rollback", e);
-                    if (!isRolledBack) {
-                        try {
-                            doRollback(context, transactionManager, status);
-                        }
-                        finally {
-                            isRolledBack = true;
-                        }
-                    }
+                    Log.debug(Log.JEEVES, "Exception completing transaction, will try to rollback", e);
                 }
+                isRolledBack = rollbackIfNotRolledBack(context, transactionManager, status, isRolledBack);
+
             } catch (Throwable t) {
-                Log.error(Log.JEEVES, "ERROR committing transaction, will try to rollback", t);
-                if (!isRolledBack) {
-                    try {
-                        doRollback(context, transactionManager, status);
-                    }
-                    finally {
-                        isRolledBack = true;
-                    }
-                }
+                Log.error(Log.JEEVES, "Unexpected problem completing transaction, will try to rollback", t);
+                isRolledBack = rollbackIfNotRolledBack(context, transactionManager, status, isRolledBack);
             }
             Log.debug(
                 Log.JEEVES,
@@ -157,21 +140,24 @@ public class TransactionManager {
                     (isRolledBack?" rolled back":"") +
                     (isCommitted?" committed":"")
             );
-            if( isRolledBack == false && isCommitted == false ){
-                Log.warning(  Log.JEEVES, "Run in transaction did not complete cleanly, transaction not committed or rolledback");
+            if( isNewTransaction || commitBehavior == CommitBehavior.ALWAYS_COMMIT ) {
+                // this transaction was our responsibility, double checking with committed or rolledback successfully
+                if (!isRolledBack && !isCommitted) {
+                    Log.warning(Log.JEEVES, "Run in transaction did not complete cleanly, transaction not committed or rolledback");
+                }
+                if (isRolledBack && isCommitted) {
+                    Log.warning(Log.JEEVES, "Run in transaction did not complete cleanly, transaction both committed and rolledback");
+                }
             }
         }
 
-        if (exception[0] != null) {
-            if (exception[0] instanceof RuntimeException) {
-                throw (RuntimeException) exception[0];
-            } else if (exception[0] instanceof Error) {
-                throw (Error) exception[0];
-            } else {
-                throw new RuntimeException("Run in transaction '"+action+"': "+exception[0].getLocalizedMessage(), exception[0]);
-            }
+    }
+
+    private static Boolean rollbackIfNotRolledBack(ApplicationContext context, PlatformTransactionManager transactionManager, TransactionStatus status, Boolean isRolledBack) {
+        if (!isRolledBack) {
+            doRollback(context, transactionManager, status);
         }
-        return result;
+        return true;
     }
 
     /**
@@ -203,6 +189,9 @@ public class TransactionManager {
         finally {
             try {
                 fireAfterCommit(context, transactionManager, status);
+                if(! status.isCompleted() ) {
+                    Log.warning( Log.JEEVES, "transactionManager.commit failed to complete");
+                }
             }
             catch( Throwable t) {
                 Log.warning(Log.JEEVES, "Commit transaction - after:", t);
@@ -212,8 +201,11 @@ public class TransactionManager {
 
     /**
      * Notify context AfterCommitTransactionListener instances of transaction status after commit.
-     *
-     * @param context context to obtains listeners from
+     * <p>
+     * Transaction commit listeners can check {@link TransactionStatus#isCompleted()} {@code true} if commit was successful,
+     * or {@code false} if the commmit failed and the code is in an inconsistent state.
+     * </p>
+     * @param context context used to obtain listeners
      * @param transactionManager manager responsible for execution
      * @param status transaction status
      * @throws Throwable
@@ -299,6 +291,10 @@ public class TransactionManager {
 
     /**
      * Notify context AfterRollbackTransactionListener instances of transaction status change.
+     * <p>
+     * Transaction rollback listeners can check {@link TransactionStatus#isCompleted()} {@code true} if rollback was successful,
+     * or {@code false} if the rollback failed and the code is in an inconsistent state.
+     * </p>
      *
      * @param context context used to obtain listeners
      * @param transactionManager manager responsible for execution
@@ -386,6 +382,9 @@ public class TransactionManager {
         finally {
             try {
                 fireAfterRollback(context, transactionManager, status);
+                if(! status.isCompleted() ) {
+                    Log.warning( Log.JEEVES, "transactionManager.rollback incomplete");
+                }
             }
             catch (Throwable t) {
                 Log.warning(Log.JEEVES, "Rolling back transaction - after:", t);

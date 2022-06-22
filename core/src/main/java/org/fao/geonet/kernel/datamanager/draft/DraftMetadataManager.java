@@ -58,9 +58,9 @@ public class DraftMetadataManager extends BaseMetadataManager implements IMetada
         super.init();
     }
 
-    public void init(ServiceContext context, Boolean force) throws Exception {
+    public void init(ServiceContext context) throws Exception {
         metadataDraftRepository = context.getBean(MetadataDraftRepository.class);
-        super.init(context, force);
+        super.init(context);
     }
 
 
@@ -133,22 +133,17 @@ public class DraftMetadataManager extends BaseMetadataManager implements IMetada
     public AbstractMetadata update(int id, @Nonnull Updater<? extends AbstractMetadata> updater) {
         AbstractMetadata md = null;
         Log.trace(Geonet.DATA_MANAGER, "AbstractMetadata.update(" + id + ")");
-        try {
-            Log.trace(Geonet.DATA_MANAGER, "Updating metadata table.");
-            md = super.update(id, updater);
-        } catch (ClassCastException t) {
-            // That's fine, maybe we are on the draft side
-        } catch (Throwable e) {
-            Log.error(Geonet.DATA_MANAGER, e.getMessage(), e);
-        }
-        if (md == null) {
+        if (metadataDraftRepository.exists(id)) {
             try {
                 Log.trace(Geonet.DATA_MANAGER, "Updating draft table.");
                 md = metadataDraftRepository.update(id, (Updater<MetadataDraft>) updater);
             } catch (ClassCastException t) {
                 throw new ClassCastException("Unknown AbstractMetadata subtype: " + updater.getClass().getName());
             }
+        } else {
+            md = super.update(id, updater);
         }
+
         return md;
     }
 

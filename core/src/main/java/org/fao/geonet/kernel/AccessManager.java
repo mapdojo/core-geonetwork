@@ -30,6 +30,8 @@ import static org.springframework.data.jpa.domain.Specifications.where;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -104,13 +106,27 @@ public class AccessManager {
      * perform on that metadata (an set of OPER_XXX as keys). If the user is authenticated the
      * permissions are taken from the groups the user belong. If the user is not authenticated, a
      * dynamic group is assigned depending on user location (0 for internal and 1 for external).
+     *
+     * @param context service context
+     * @param mdId metadata record to check
+     * @param ip IP Address used to determine base operations
+     * @return set of base operations along with any additional reserved operations available to user
      */
     public Set<Operation> getOperations(ServiceContext context, String mdId, String ip) throws Exception {
         return getOperations(context, mdId, ip, null);
     }
 
     /**
-     * TODO javadoc.
+     * Given a user(session) a list of groups and a metadata returns all operations that user can
+     * perform on that metadata (an set of OPER_XXX as keys). If the user is authenticated the
+     * permissions are taken from the groups the user belong. If the user is not authenticated, a
+     * dynamic group is assigned depending on user location (0 for internal and 1 for external).
+     *
+     * @param context service context
+     * @param mdId metadata record to check
+     * @param ip IP Address used to determine base operations (if not provided)
+     * @param operations base operations
+     * @return set of base operations along with any additional reserved operations available to user
      */
     public Set<Operation> getOperations(ServiceContext context, String mdId, String ip, Collection<Operation> operations) throws Exception {
         Set<Operation> results;
@@ -125,7 +141,8 @@ public class AccessManager {
             }
 
             UserSession us = context.getUserSession();
-            if ((us != null) && us.isAuthenticated() && us.getProfile() == Profile.Editor && us.getProfile() == Profile.Reviewer) {
+            if ((us != null) && us.isAuthenticated() &&
+                (us.getProfile() == Profile.Editor || us.getProfile() == Profile.Reviewer)) {
                 results.add(operationRepository.findReservedOperation(ReservedOperation.view));
             }
         }
@@ -379,7 +396,8 @@ public class AccessManager {
      */
     public Element getContentReviewers(ServiceContext context, final Set<Integer> metadataIds) throws Exception {
         List<Pair<Integer, User>> results = userRepository.findAllByGroupOwnerNameAndProfile(metadataIds,
-            Profile.Reviewer, SortUtils.createSort(User_.name));
+            Profile.Reviewer);
+        Collections.sort(results, Comparator.comparing(s -> s.two().getName()));
 
         Element resultEl = new Element("results");
         for (Pair<Integer, User> integerUserPair : results) {

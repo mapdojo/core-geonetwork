@@ -23,7 +23,7 @@
 
 package org.fao.geonet.component.csw;
 
-import com.vividsolutions.jts.util.Assert;
+import org.locationtech.jts.util.Assert;
 import jeeves.server.UserSession;
 import jeeves.server.context.ServiceContext;
 import org.fao.geonet.GeonetContext;
@@ -285,6 +285,8 @@ public class Transaction extends AbstractOperation implements CatalogService {
 
         if (metadataPublic) {
             dataMan.setOperation(context, id, "" + ReservedGroup.all.getId(), ReservedOperation.view);
+            dataMan.setOperation(context, id, "" + ReservedGroup.all.getId(), ReservedOperation.download);
+            dataMan.setOperation(context, id, "" + ReservedGroup.all.getId(), ReservedOperation.dynamic);
         }
 
         dataMan.indexMetadata(id, true, null);

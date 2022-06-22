@@ -37,6 +37,7 @@
     "chooseContactRole": "nebo vyberte roli",
     "chooseEntry": "Prohledat adresář",
     "clickToAddResource": "Klepnutím vyberte tento zdroj",
+    "externalResourceManagement": "Kliknutím přejdete na externího správce prostředků",
     "beforeUnloadEditor": "Je možné, že po posledním ukládání nebyly některé změny uloženy {{timeAgo}}.",
     "fieldIsRemoved": "Toto pole bude odebráno",
     "editRecords": "Upravit výběr",
@@ -420,5 +421,6 @@
     "badGmlProjectionCode": "Projekce geometrie <b>{{srsName}}</b> definovaná v XML není platná. Upravte xml, abyste opravili název srs nebo zadejte novou geometrii.",
     "draft": "Pracovní kopie",
     "link": "Odkaz",
-    "link-text": "Text odkazu"
+    "link-text": "Text odkazu",
+    "confirmCancelEdit": "Do you want to cancel all changes and close the editor?"
 }

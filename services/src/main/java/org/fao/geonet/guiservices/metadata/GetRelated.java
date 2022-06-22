@@ -159,8 +159,8 @@ public class GetRelated implements Service, RelatedMetadata {
         GeonetworkDataDirectory dataDirectory = appContext.getBean(GeonetworkDataDirectory.class);
         MetadataRepository metadataRepository = appContext.getBean(MetadataRepository.class);
 
-        final ServiceContext context = serviceManager.createServiceContext("xml.relation", lang, request);
-
+        // context used as parameter, not set as threadlocale
+      try (ServiceContext context = serviceManager.createServiceContext("xml.relation", lang, request)) {
         AbstractMetadata md;
         if (id != null) {
             md = metadataRepository.findOne(id);
@@ -209,6 +209,7 @@ public class GetRelated implements Service, RelatedMetadata {
         headers.add("Content-Type", contentType);
 
         return new HttpEntity<>(response, headers);
+      }
     }
 
     private boolean acceptsType(Set<String> acceptContentType, String toCheck) {

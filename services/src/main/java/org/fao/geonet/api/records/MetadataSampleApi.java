@@ -126,8 +126,8 @@ public class MetadataSampleApi {
         HttpServletRequest request
     )
         throws Exception {
+      try (ServiceContext context = ApiUtils.createServiceContext(request)) {
         ApplicationContext applicationContext = ApplicationContextHolder.get();
-        ServiceContext context = ApiUtils.createServiceContext(request);
         SimpleMetadataProcessingReport report = new SimpleMetadataProcessingReport();
         UserSession userSession = ApiUtils.getUserSession(request.getSession());
 
@@ -189,7 +189,9 @@ public class MetadataSampleApi {
                 schemaCount, schemaName));
         }
         report.close();
+
         return report;
+      }
     }
 
     @ApiOperation(
@@ -221,8 +223,7 @@ public class MetadataSampleApi {
         HttpServletRequest request
     )
         throws Exception {
-        ServiceContext context = ApiUtils.createServiceContext(request);
-
+      try (ServiceContext context = ApiUtils.createServiceContext(request)) {
         SimpleMetadataProcessingReport report = new SimpleMetadataProcessingReport();
 
         String siteId = settingManager.getSiteId();
@@ -295,6 +296,10 @@ public class MetadataSampleApi {
                                 setSourceId(siteId).
                                 setOwner(owner).
                                 setGroupOwner(1);
+                            // Set the UUID explicitly, insertMetadata doesn't update the xml with the generated UUID for templates
+                            if (MetadataType.lookup(isTemplate) == MetadataType.TEMPLATE) {
+                                xml = dataManager.setUUID(schemaName, uuid, xml);
+                            }
                             dataManager.insertMetadata(context, metadata, xml, true, true, true, UpdateDatestamp.NO, false, false);
                             report.addMetadataInfos(metadata,
                             String.format(
@@ -321,5 +326,6 @@ public class MetadataSampleApi {
         }
         report.close();
         return report;
+      }
     }
 }
