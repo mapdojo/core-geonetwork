@@ -1,5 +1,5 @@
 //=============================================================================
-//===	Copyright (C) 2001-2007 Food and Agriculture Organization of the
+//===	Copyright (C) 2001-2021 Food and Agriculture Organization of the
 //===	United Nations (FAO-UN), United Nations World Food Programme (WFP)
 //===	and United Nations Environment Programme (UNEP)
 //===
@@ -23,7 +23,13 @@
 
 package org.fao.geonet;
 
-import com.vividsolutions.jts.geom.MultiPolygon;
+import java.util.Collections;
+import javax.persistence.EntityManager;
+import jeeves.server.UserSession;
+import jeeves.server.dispatchers.ServiceManager;
+import org.fao.geonet.api.ApiUtils;
+import org.fao.geonet.kernel.datamanager.IMetadataManager;
+import org.locationtech.jts.geom.MultiPolygon;
 import jeeves.config.springutil.ServerBeanPropertyUpdater;
 import jeeves.constants.Jeeves;
 import jeeves.interfaces.ApplicationHandler;
@@ -134,8 +140,12 @@ public class Geonetwork implements ApplicationHandler {
 
     /**
      * Inits the engine, loading all needed data.
+     *
+     * @param config Handler configuration
+     * @param context application handler servlet context
+     * @return GeonetContext for application
      */
-    public Object start(Element config, ServiceContext context) throws Exception {
+    public GeonetContext start(Element config, ServiceContext context) throws Exception {
         context.setAsThreadLocal();
         this._applicationContext = context.getApplicationContext();
         ApplicationContextHolder.set(this._applicationContext);
@@ -176,6 +186,8 @@ public class Geonetwork implements ApplicationHandler {
         final GeonetworkDataDirectory dataDirectory = _applicationContext.getBean(GeonetworkDataDirectory.class);
         dataDirectory.init(webappName, appPath, handlerConfig, context.getServlet());
 
+
+
         // Get config handler properties
         String systemDataDir = handlerConfig.getMandatoryValue(Geonet.Config.SYSTEM_DATA_DIR);
         String thesauriDir = handlerConfig.getMandatoryValue(Geonet.Config.CODELIST_DIR);
@@ -185,6 +197,11 @@ public class Geonetwork implements ApplicationHandler {
         logger.info("Data directory: " + systemDataDir);
 
         setProps(appPath, handlerConfig);
+
+        // Initialize password encryptor
+        logger.info("Initializing database password encryptor");
+        final EncryptorInitializer encryptorInitializer = _applicationContext.getBean(EncryptorInitializer.class);
+        encryptorInitializer.init(dataDirectory);
 
         importDatabaseData(context);
 
@@ -284,7 +301,7 @@ public class Geonetwork implements ApplicationHandler {
 
         // if the validator exists the proxyCallbackURL needs to have the external host and
         // servlet name added so that the cas knows where to send the validation notice
-        ServerBeanPropertyUpdater.updateURL(settingInfo.getSiteUrl(true) + baseURL, _applicationContext);
+        ServerBeanPropertyUpdater.updateURL(settingInfo.getSiteUrl() + baseURL, _applicationContext);
 
         //------------------------------------------------------------------------
         //--- extract intranet ip/mask and initialize AccessManager
@@ -336,7 +353,8 @@ public class Geonetwork implements ApplicationHandler {
         beanFactory.registerSingleton("oaipmhDisatcher", oaipmhDis);
 
 
-        _applicationContext.getBean(DataManager.class).init(context, false);
+        _applicationContext.getBean(DataManager.class).init(context);
+        _applicationContext.getBean(DataManager.class).refreshIndex(false);
         _applicationContext.getBean(HarvestManager.class).init(context, gnContext.isReadOnly());
 
         _applicationContext.getBean(ThumbnailMaker.class).init(context);
@@ -406,7 +424,7 @@ public class Geonetwork implements ApplicationHandler {
             createDBHeartBeat(gnContext, dbHeartBeatInitialDelay, dbHeartBeatFixedDelay);
         }
 
-        fillCaches(context);
+        fillCaches();
 
         AbstractEntityListenerManager.setSystemRunning(true);
 
@@ -415,15 +433,19 @@ public class Geonetwork implements ApplicationHandler {
         return gnContext;
     }
 
-    private void fillCaches(final ServiceContext context) {
-        final FormatterApi formatService = context.getBean(FormatterApi.class); // this will initialize the formatter
-
+    private void fillCaches() {
         Thread fillCaches = new Thread(new Runnable() {
             @Override
             public void run() {
-                final ServletContext servletContext = context.getServlet().getServletContext();
-                context.setAsThreadLocal();
+                ServiceManager serviceManager = _applicationContext.getBean(ServiceManager.class);
+              try (ServiceContext fillCacheServiceContext = serviceManager.createServiceContext( "init.filleCaches",_applicationContext)) {
+                fillCacheServiceContext.setUserSession( new UserSession() );
+                FormatterApi formatService = fillCacheServiceContext.getBean(FormatterApi.class); // this will initialize the formatter
+
+                final ServletContext servletContext = fillCacheServiceContext.getServlet().getServletContext();
+                fillCacheServiceContext.setAsThreadLocal();
                 ApplicationContextHolder.set(_applicationContext);
+
                 GeonetWro4jFilter filter = (GeonetWro4jFilter) servletContext.getAttribute(GeonetWro4jFilter.GEONET_WRO4J_FILTER_KEY);
 
                 @SuppressWarnings("unchecked")
@@ -444,14 +466,14 @@ public class Geonetwork implements ApplicationHandler {
                 final Page<Metadata> metadatas = _applicationContext.getBean(MetadataRepository.class).findAll(new PageRequest(0, 1));
                 if (metadatas.getNumberOfElements() > 0) {
                     Integer mdId = metadatas.getContent().get(0).getId();
-                    context.getUserSession().loginAs(new User().setName("admin").setProfile(Profile.Administrator).setUsername("admin"));
+                    fillCacheServiceContext.getUserSession().loginAs(new User().setName("admin").setProfile(Profile.Administrator).setUsername("admin"));
                     @SuppressWarnings("unchecked")
                     List<String> formattersToInitialize = _applicationContext.getBean("formattersToInitialize", List.class);
 
                     for (String formatterName : formattersToInitialize) {
                         Log.info(Geonet.GEONETWORK, "Initializing the Formatter with id: " + formatterName);
                         final MockHttpSession servletSession = new MockHttpSession(servletContext);
-                        servletSession.setAttribute(Jeeves.Elem.SESSION,  context.getUserSession());
+                        servletSession.setAttribute(Jeeves.Elem.SESSION, fillCacheServiceContext.getUserSession());
                         final MockHttpServletRequest servletRequest = new MockHttpServletRequest(servletContext);
                         servletRequest.setSession(servletSession);
                         final MockHttpServletResponse response = new MockHttpServletResponse();
@@ -463,6 +485,7 @@ public class Geonetwork implements ApplicationHandler {
                         }
                     }
                 }
+              }
             }
         });
         fillCaches.setDaemon(true);
@@ -477,6 +500,10 @@ public class Geonetwork implements ApplicationHandler {
         final long count = settingRepository.count();
         if (count == 0) {
             try {
+                // Set setFirstInitialSetupFlag to true for the encryptorInitializer as this is a new installation.
+                EncryptorInitializer encryptorInitializer = context.getBean(EncryptorInitializer.class);
+                encryptorInitializer.setFirstInitialSetupFlag(true);
+
                 // import data from init files
                 List<Pair<String, String>> importData = context.getBean("initial-data", List.class);
                 final DbLib dbLib = new DbLib();
@@ -627,6 +654,14 @@ public class Geonetwork implements ApplicationHandler {
         // Beans registered using SingletonBeanRegistry#registerSingleton don't have their
         // @PreDestroy called. So do it manually.
         oaipmhDis.shutdown();
+
+        // shutdown data manager
+        try {
+            _applicationContext.getBean(DataManager.class).destroy();
+        } catch (Exception e) {
+            logger.error("Raised exception while stopping data manager");
+            logger.error(e);
+        }
     }
 
     //---------------------------------------------------------------------------

@@ -246,11 +246,14 @@ public class InspireAtomUtil {
         for (Object field : atomIndexFields.getChildren()) {
             Element f = (Element) field;
 
-            DatasetFeedInfo datasetFeedInfo = new DatasetFeedInfo(f.getChildText("identifier"),
-                f.getChildText("namespace"),
-                f.getChildText("feedUrl"));
+            // Some feed entries contain an empty identifier, skip them
+            if (StringUtils.isNotEmpty(f.getChildText("identifier"))) {
+                DatasetFeedInfo datasetFeedInfo = new DatasetFeedInfo(f.getChildText("identifier"),
+                    f.getChildText("namespace"),
+                    f.getChildText("feedUrl"));
 
-            datasetsInformation.add(datasetFeedInfo);
+                datasetsInformation.add(datasetFeedInfo);
+            }
         }
 
         return datasetsInformation;
@@ -345,7 +348,9 @@ public class InspireAtomUtil {
 
         // perform the search and return the results read from the index
         try (MetaSearcher searcher = searchMan.newSearcher(SearcherType.LUCENE, Geonet.File.SEARCH_LUCENE)) {
-            searcher.search(context, request, new ServiceConfig());
+            ServiceConfig serviceConfig = new ServiceConfig();
+            serviceConfig.setValue(Geonet.SearchConfig.SEARCH_IGNORE_PORTAL_FILTER_OPTION, "true");
+            searcher.search(context, request, serviceConfig);
 
             Map<Integer, AbstractMetadata> allMdInfo = ((LuceneSearcher) searcher).getAllMdInfo(context, searcher.getSize());
             return new ArrayList<>(allMdInfo.values());
@@ -368,7 +373,9 @@ public class InspireAtomUtil {
         // perform the search and return the results read from the index
 
         try (MetaSearcher searcher = searchMan.newSearcher(SearcherType.LUCENE, Geonet.File.SEARCH_LUCENE)) {
-            searcher.search(context, request, new ServiceConfig());
+            ServiceConfig serviceConfig = new ServiceConfig();
+            serviceConfig.setValue(Geonet.SearchConfig.SEARCH_IGNORE_PORTAL_FILTER_OPTION, "true");
+            searcher.search(context, request, serviceConfig);
 
             List<String> uuids = ((LuceneSearcher) searcher).getAllUuids(1, context);
             if (uuids.size() > 0) {
@@ -475,6 +482,8 @@ public class InspireAtomUtil {
     public static Element getDatasetFeed(final ServiceContext context, final String spIdentifier, final String spNamespace, final Map<String, Object> params, String requestedLanguage) throws Exception {
 
         ServiceConfig config = new ServiceConfig();
+        config.setValue(Geonet.SearchConfig.SEARCH_IGNORE_PORTAL_FILTER_OPTION, "true");
+
         SearchManager searchMan = context.getBean(SearchManager.class);
 
         // Search for the dataset identified by spIdentifier
@@ -524,7 +533,7 @@ public class InspireAtomUtil {
 
         String serviceMdUuid = null;
         Document luceneParamSearch = createDefaultLuceneSearcherParams();
-        luceneParamSearch.getRootElement().addContent(new Element("operatesOn").setText(datasetMd.getUuid() + " or " + spIdentifier));
+        luceneParamSearch.getRootElement().addContent(new Element("operatesOn").setText(datasetMd.getUuid() + "* or " + spIdentifier + "*"));
         luceneParamSearch.getRootElement().addContent(new Element("serviceType").setText("download"));
 
         try (MetaSearcher searcher = searchMan.newSearcher(SearcherType.LUCENE, Geonet.File.SEARCH_LUCENE)) {
@@ -744,7 +753,10 @@ public class InspireAtomUtil {
         // perform the search and return the results read from the index
 
         try (MetaSearcher searcher = searchMan.newSearcher(SearcherType.LUCENE, Geonet.File.SEARCH_LUCENE)) {
-            searcher.search(context, request, new ServiceConfig());
+            ServiceConfig serviceConfig = new ServiceConfig();
+            serviceConfig.setValue(Geonet.SearchConfig.SEARCH_IGNORE_PORTAL_FILTER_OPTION, "true");
+
+            searcher.search(context, request, serviceConfig);
 
             List<Element> keywordElems = ((LuceneSearcher) searcher).getSummary().getChild("summary").getChild("keywords").getChildren();
             for (Element elem : keywordElems) {

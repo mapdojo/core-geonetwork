@@ -35,17 +35,22 @@
         '$http', '$filter',
       function($http, $filter) {
         this.delete = function (step) {
-          return $http.delete('../api/records/' + step.id.metadataId + '/status/' +
-            step.id.statusId + '.' + step.id.userId + '.' + step.id.changeDate.dateAndTime);
+          return $http.delete('../api/records/' + step.metadataId + '/status/' +
+            step.statusId + '.' + step.userId + '.' + step.dateChange);
         };
 
         this.close = function (step, optionalDateOrNow) {
-          return $http.put('../api/records/' + step.id.metadataId + '/status/' +
-            step.id.statusId + '.' + step.id.userId + '.' +
-            step.id.changeDate.dateAndTime +
+          return $http.put('../api/records/' + step.metadataId + '/status/' +
+            step.statusId + '.' + step.userId + '.' +
+            step.dateChange +
             '/close?closeDate=' + (optionalDateOrNow || moment().format('YYYY-MM-DDTHH:mm:ss')));
         };
 
+        this.restoreHistoryElement = function(step) {
+          return $http.post('../api/records/' + step.metadataId + '/status/' +
+              step.statusId + '.' + step.userId + '.' +
+              step.dateChange + '/restore');
+        };
 
         function buildFilter(filter) {
           var filters = [];
@@ -80,24 +85,4 @@
           return $http.get('../api/records/status/search' + buildFilter(filter));
         };
       }]);
-
-
-  /**
-   * Service to deal with tasks. For now only DOI related.
-   */
-  module
-    .service(
-      'gnRecordTaskService', [
-        '$http', 'gnConfig', '$translate',
-        function($http, gnConfig, $translate) {
-
-          this.doiCreationTask = {
-            check: function (status) {
-              return $http.get('../api/records/' + status.id.metadataId + '/doi/checkPreConditions');
-            },
-            create: function (status) {
-              return $http.put('../api/records/' + status.id.metadataId + '/doi');
-            }
-          };
-        }]);
 })();

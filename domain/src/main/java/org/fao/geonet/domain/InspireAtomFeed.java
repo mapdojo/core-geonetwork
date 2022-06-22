@@ -77,20 +77,22 @@ public class InspireAtomFeed extends GeonetEntity implements Serializable {
         Namespace ns = Namespace.getNamespace("f", "http://www.w3.org/2005/Atom");
         Namespace nsXml = Namespace.getNamespace("xml", "http://www.w3.org/XML/1998/namespace");
 
-        inspireAtomFeed.setTitle(atomDoc.getChildText("title", ns));
+        inspireAtomFeed.setTitle(StringUtils.left(atomDoc.getChildText("title", ns), 255));
 
         if (atomDoc.getChildText("subtitle", ns) != null) {
-            inspireAtomFeed.setSubtitle(atomDoc.getChildText("subtitle", ns));
+            inspireAtomFeed.setSubtitle(StringUtils.left(atomDoc.getChildText("subtitle", ns), 255));
         }
 
         if (atomDoc.getChildText("rights", ns) != null) {
-            inspireAtomFeed.setRights(atomDoc.getChildText("rights", ns));
+            inspireAtomFeed.setRights(StringUtils.left(atomDoc.getChildText("rights", ns), 255));
         }
 
         Element authorEl = atomDoc.getChild("author", ns);
         if (authorEl != null) {
-            inspireAtomFeed.setAuthorName(atomDoc.getChild("author", ns).getChildText("name", ns));
-            inspireAtomFeed.setAuthorEmail(atomDoc.getChild("author", ns).getChildText("email", ns));
+            inspireAtomFeed.setAuthorName(
+                StringUtils.left(atomDoc.getChild("author", ns).getChildText("name", ns), 255));
+            inspireAtomFeed.setAuthorEmail(
+                StringUtils.left(atomDoc.getChild("author", ns).getChildText("email", ns), 255));
         }
 
         try {
@@ -112,10 +114,14 @@ public class InspireAtomFeed extends GeonetEntity implements Serializable {
         List<Element> entryList = atomDoc.getChildren("entry", ns);
         for (Element entry : entryList) {
             for (Element linkEl : (List<Element>) entry.getChildren("link", ns)) {
-                if (linkEl.getAttributeValue("rel", "").equals("alternate")) {
+                // Process data feed download links:
+                //  - alternate: single download files/links per datafeed entry
+                //  - section: multiple download files/links per datafeed entry
+                if (linkEl.getAttributeValue("rel", "").equals("alternate") ||
+                    linkEl.getAttributeValue("rel", "").equals("section")) {
                     InspireAtomFeedEntry inspireAtomFeedEntry = new InspireAtomFeedEntry();
 
-                    inspireAtomFeedEntry.setTitle(entry.getChildText("title", ns));
+                    inspireAtomFeedEntry.setTitle(StringUtils.left(entry.getChildText("title", ns), 255));
 
                     if (entry.getChildText("category", ns) != null) {
                         inspireAtomFeedEntry.setCrs(entry.getChild("category", ns).getAttributeValue("term"));

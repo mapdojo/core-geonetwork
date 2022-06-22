@@ -86,7 +86,7 @@
                     '/validate/inspire?testsuite=' + test
                   }).then(function mySucces(response) {
                     if (angular.isDefined(response.data) && response.data != null) {
-                      scope.checkInBackgroud(response.data);
+                      scope.checkInBackgroud(response.data.testId);
                     } else {
                       scope.isDownloadingRecord = false;
                       scope.isDownloadedRecord = false;
@@ -116,6 +116,11 @@
                     } else if (error.status == 500) {
                       gnAlertService.addAlert({
                         msg: $translate.instant('inspireServiceError'),
+                        type: 'danger'
+                      });
+                    } else {
+                      gnAlertService.addAlert({
+                        msg: error.data.description,
                         type: 'danger'
                       });
                     }

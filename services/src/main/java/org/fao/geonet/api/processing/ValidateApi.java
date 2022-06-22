@@ -36,6 +36,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
 
 
+import org.apache.commons.lang.StringUtils;
 import org.fao.geonet.ApplicationContextHolder;
 import org.fao.geonet.api.API;
 import org.fao.geonet.api.ApiParams;
@@ -182,13 +183,13 @@ public class ValidateApi {
         @ApiIgnore
             HttpServletRequest request
     ) throws Exception {
+
         UserSession userSession = ApiUtils.getUserSession(session);
 
-        SimpleMetadataProcessingReport report =
-            new SimpleMetadataProcessingReport();
-        try {
-            ApplicationContext applicationContext = ApplicationContextHolder.get();
-            ServiceContext serviceContext = ApiUtils.createServiceContext(request);
+        SimpleMetadataProcessingReport report = new SimpleMetadataProcessingReport();
+        ApplicationContext applicationContext = ApplicationContextHolder.get();
+
+        try (ServiceContext serviceContext = ApiUtils.createServiceContext(request)){
 
             Set<String> records = ApiUtils.getUuidsParameterOrSelection(uuids, bucket, userSession);
             report.setTotalRecords(records.size());
@@ -277,8 +278,7 @@ public class ValidateApi {
         @ApiIgnore
             HttpServletRequest request
     ) throws Exception {
-        ServiceContext serviceContext = ApiUtils.createServiceContext(request);
-
+      try (ServiceContext serviceContext = ApiUtils.createServiceContext(request)) {
         MInspireEtfValidateProcess registredMAnalyseProcess = getRegistredMInspireEtfValidateProcess(serviceContext);
 
         registredMAnalyseProcess.deleteAll();
@@ -289,12 +289,17 @@ public class ValidateApi {
 
         registredMAnalyseProcess.processMetadata(records);
         return new ResponseEntity(HttpStatus.CREATED);
+      }
     }
 
     private MInspireEtfValidateProcess getRegistredMInspireEtfValidateProcess(ServiceContext serviceContext) {
         String URL = settingManager.getValue(Settings.SYSTEM_INSPIRE_REMOTE_VALIDATION_URL);
+        String URL_QUERY = settingManager.getValue(Settings.SYSTEM_INSPIRE_REMOTE_VALIDATION_URL_QUERY);
+        if (StringUtils.isEmpty(URL_QUERY)) {
+            URL_QUERY = URL;
+        }
 
-        MInspireEtfValidateProcess mAnalyseProcess = new MInspireEtfValidateProcess(URL, serviceContext, appContext);
+        MInspireEtfValidateProcess mAnalyseProcess = new MInspireEtfValidateProcess(URL, URL_QUERY, serviceContext, appContext);
         mBeanExporter.registerManagedResource(mAnalyseProcess, mAnalyseProcess.getObjectName());
         try {
             mBeanExporter.unregisterManagedResource(mAnalyseProcesses.removeLast().getObjectName());

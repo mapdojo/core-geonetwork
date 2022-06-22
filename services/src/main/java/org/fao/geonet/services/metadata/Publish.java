@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2016 Food and Agriculture Organization of the
+ * Copyright (C) 2001-2022 Food and Agriculture Organization of the
  * United Nations (FAO-UN), United Nations World Food Programme (WFP)
  * and United Nations Environment Programme (UNEP)
  *
@@ -28,6 +28,7 @@ import static org.fao.geonet.repository.specification.OperationAllowedSpecs.hasM
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
@@ -53,11 +54,8 @@ import org.fao.geonet.kernel.setting.Settings;
 import org.fao.geonet.repository.GroupRepository;
 import org.fao.geonet.repository.MetadataValidationRepository;
 import org.fao.geonet.repository.OperationAllowedRepository;
-import org.fao.geonet.repository.specification.MetadataValidationSpecs;
 import org.fao.geonet.repository.specification.OperationAllowedSpecs;
 import org.fao.geonet.util.WorkflowUtil;
-import org.jdom.Document;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.domain.Specifications;
@@ -102,9 +100,10 @@ public class Publish {
         @RequestParam(value = "skipIntranet", defaultValue = "false") boolean skipIntranet) throws Exception {
         ConfigurableApplicationContext appContext = ApplicationContextHolder.get();
         ServiceManager serviceManager = appContext.getBean(ServiceManager.class);
-        final ServiceContext serviceContext = serviceManager.createServiceContext("md.publish", lang, request);
 
+      try (ServiceContext serviceContext = serviceManager.createServiceContext("md.publish", lang, request)) {
         return exec(commaSeparatedIds, true, skipIntranet, serviceContext);
+      }
     }
 
 
@@ -118,9 +117,10 @@ public class Publish {
         @RequestParam(value = "skipIntranet", defaultValue = "false") boolean skipIntranet) throws Exception {
         ConfigurableApplicationContext appContext = ApplicationContextHolder.get();
         ServiceManager serviceManager = appContext.getBean(ServiceManager.class);
-        final ServiceContext serviceContext = serviceManager.createServiceContext("md.publish", lang, request);
 
+      try (ServiceContext serviceContext = serviceManager.createServiceContext("md.publish", lang, request)) {
         return exec(commaSeparatedIds, false, skipIntranet, serviceContext);
+      }
     }
 
     /**
@@ -130,6 +130,7 @@ public class Publish {
      * @param commaSeparatedIds the ids of the metadata to publish/unpublish.
      * @param publish           if true the metadata will be published otherwise unpublished
      * @param skipIntranet      if true then metadata only the all group will be affected
+     * @param serviceContext    service context
      */
     private PublishReport exec(String commaSeparatedIds, boolean publish, boolean skipIntranet, ServiceContext serviceContext) throws
         Exception {
@@ -187,7 +188,7 @@ public class Publish {
                 if (!allowPublishNonApprovedMd) {
                     MetadataStatus metadataStatus = metadataStatusRepository.getStatus(metadata.getId());
 
-                    String statusId = metadataStatus.getId().getStatusId() + "";
+                    String statusId = metadataStatus.getStatusValue().getId() + "";
                     if (!statusId.equals(StatusValue.Status.APPROVED)) {
                         report.incNoApproved();
                         continue;
@@ -226,7 +227,7 @@ public class Publish {
                     }
                 });
             } else {
-                return Iterators.emptyIterator();
+                return Collections.emptyIterator();
             }
         } else {
             return new Iterator<String>() {

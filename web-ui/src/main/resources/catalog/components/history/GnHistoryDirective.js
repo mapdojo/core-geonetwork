@@ -112,47 +112,57 @@
 
   module
     .directive(
-      'gnRecordHistoryStep', ['gnRecordTaskService', 'gnRecordHistoryService',
-        function(gnRecordTaskService, gnRecordHistoryService) {
+      'gnRecordHistoryStep', ['gnDoiService', 'gnRecordHistoryService', '$translate', '$window',
+        function(gnDoiService, gnRecordHistoryService, $translate, $window) {
           return {
             restrict: 'A',
             replace: true,
             scope: {
               h: '=gnRecordHistoryStep',
               noTitle: '@noTitle',
+              noSourceViewOption: '@noTitle',
+              noRecoverOption: '@noTitle',
               allowRemoval: '=allowRemoval'
             },
             templateUrl:
                 '../../catalog/components/history/partials/historyStep.html',
             link: function postLink(scope, element, attrs) {
 
-              scope.response = {
-                doiCreationTask: {}
-              };
-              scope.doiCreationTask = {
-                check: function(status) {
-                  scope.response.doiCreationTask = {};
-                  scope.response.doiCreationTask['check'] = null;
-                  return gnRecordTaskService.doiCreationTask.check(status).then(function (r) {
-                    scope.response.doiCreationTask['check'] = r;
-                  }, function (r) {
-                    scope.response.doiCreationTask['check'] = r;
-                  });
-                },
-                create: function(status){
-                  return gnRecordTaskService.doiCreationTask.create(status).then(function(r) {
-                    scope.response.doiCreationTask['create'] = r;
-                    scope.closeTask(status);
-                  }, function(r) {
-                    scope.response.doiCreationTask['create'] = r;
-                  });
-                }
-              };
 
               scope.removeStep = function(s){
                 gnRecordHistoryService.delete(s).then(function(r) {
                   scope.$parent.loadHistory();
                 });
+              };
+
+              scope.restoreHistoryElement = function(statusId) {
+                confirmMessage = $translate.instant('confirmRestore');
+                if($window.confirm(confirmMessage)) {
+                    return gnRecordHistoryService.restoreHistoryElement(statusId).then(function(r) {
+                          message = $translate.instant('recordRestored');
+                          scope.$emit('StatusUpdated', {
+                              msg: message,
+                              timeout: 0,
+                              type: 'info'});
+                          // Reload the page to load the new value
+                          $window.location.reload();
+                    }, function(response) {
+                          message = '';
+                          if(response.status === 403) {
+                              message = $translate.instant('notAllowedError');
+                          } else if(response.status === 404) {
+                              message = $translate.instant('notFoundError');
+                          } else if(response.status === 500) {
+                              message = $translate.instant('internalServerError');
+                          } else {
+                              message = $translate.instant('internalServerError');
+                          }
+                          scope.$emit('StatusUpdated', {
+                              msg: message,
+                              timeout: 0,
+                              type: 'danger'});
+                    });
+                }
               };
 
               scope.closeTask = function(status) {
@@ -171,9 +181,9 @@
     .directive(
       'gnHistory', [
         '$http', '$filter', 'gnConfig', 'gnConfigService', '$translate',
-        'gnSearchManagerService', 'gnRecordHistoryService', 'gnRecordTaskService',
+        'gnSearchManagerService', 'gnRecordHistoryService', 'gnDoiService',
         function($http, $filter, gnConfig, gnConfigService, $translate,
-                 gnSearchManagerService, gnRecordHistoryService, gnRecordTaskService) {
+                 gnSearchManagerService, gnRecordHistoryService, gnDoiService) {
           return {
             restrict: 'A',
             replace: true,

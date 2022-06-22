@@ -24,17 +24,6 @@
 (function() {
   goog.provide('gn_editor_controller');
 
-
-
-
-
-
-
-
-
-
-
-
   goog.require('gn_batchedit_controller');
   goog.require('gn_directory_controller');
   goog.require('gn_editorboard_controller');
@@ -519,7 +508,7 @@
               $scope.saveError = true;
               $rootScope.$broadcast('StatusUpdated', {
                 title: $translate.instant('saveMetadataError'),
-                error: error,
+                error: error.description,
                 timeout: 0,
                 type: 'danger'});
             });
@@ -545,6 +534,12 @@
       };
 
       $scope.cancel = function(refreshForm) {
+
+        var doCancel = confirm($translate.instant('confirmCancelEdit'));
+
+        if (!doCancel) {
+          return false;
+        }
         $scope.savedStatus = gnCurrentEdit.savedStatus;
         if ($location.search()['justcreated']) {
           // Remove newly created record
@@ -559,7 +554,8 @@
                 closeEditor();
               }, function(reason) {
                 $rootScope.$broadcast('StatusUpdated', {
-                  title: $translate.instant(reason.data.error.message),
+                  title: reason.data.message, //returned error JSON obj
+                  error: reason.data.description,
                   timeout: 0,
                   type: 'danger'
                 });
@@ -576,10 +572,11 @@
                 //  gnEditor.refreshEditorForm(null, true);
                 closeEditor();
               }, function(error) {
+                //an api-error is returned as xml
                 $scope.savedStatus = gnCurrentEdit.savedStatus;
                 $rootScope.$broadcast('StatusUpdated', {
                   title: $translate.instant('cancelMetadataError'),
-                  error: error,
+                  error: $(data).find('description').text(),
                   timeout: 0,
                   type: 'danger'});
               });
@@ -620,7 +617,7 @@
 
               $rootScope.$broadcast('StatusUpdated', {
                 title: error ? error.message : $translate.instant('saveMetadataError'),
-                error: error,
+                error: error.description,
                 timeout: 0,
                 type: 'danger'});
             });

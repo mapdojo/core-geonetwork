@@ -42,11 +42,11 @@
       ['$scope', '$http', '$rootScope', '$translate',
        '$location', '$window', '$timeout',
        'gnUtilityService', 'gnConfig', 'gnGlobalSettings',
-       'vcRecaptchaService', '$q',
+       'vcRecaptchaService', 'gnUrlUtils', '$q', 'gnLangs',
        function($scope, $http, $rootScope, $translate,
            $location, $window, $timeout,
                gnUtilityService, gnConfig, gnGlobalSettings,
-               vcRecaptchaService, $q) {
+               vcRecaptchaService, gnUrlUtils, $q, gnLangs) {
           $scope.formAction = '../../signin#' +
          $location.path();
           $scope.registrationStatus = null;
@@ -62,11 +62,26 @@
          gnConfig['system.userSelfRegistration.recaptcha.publickey'];
           $scope.resolveRecaptcha = false;
 
-          $scope.redirectUrl = gnUtilityService.getUrlParameter('redirect');
+          var redirect = gnUtilityService.getUrlParameter('redirect');
+
+          if ((redirect) && gnUrlUtils.urlIsSameOrigin(redirect)) {
+            $scope.redirectUrl = redirect;
+          } else {
+            $scope.redirectUrl = "";
+          }
+
           $scope.signinFailure = gnUtilityService.getUrlParameter('failure');
           $scope.gnConfig = gnConfig;
-          $scope.shibbolethEnabled = gnGlobalSettings.shibbolethEnabled;
-          $scope.shibbolethHideLogin = gnGlobalSettings.shibbolethHideLogin;
+          $scope.isDisableLoginForm = gnGlobalSettings.isDisableLoginForm;
+          $scope.isShowLoginAsLink = gnGlobalSettings.isShowLoginAsLink;
+         $scope.isUserProfileUpdateEnabled = gnGlobalSettings.isUserProfileUpdateEnabled;
+
+         $scope.passwordMinLength =
+           Math.min(gnConfig['system.security.passwordEnforcement.minLength'], 6);
+         $scope.passwordMaxLength =
+           Math.max(gnConfig['system.security.passwordEnforcement.maxLength'], 6);
+         $scope.passwordPattern =
+           gnConfig['system.security.passwordEnforcement.pattern'];
 
           function initForm() {
            if ($window.location.pathname.indexOf('new.password') !== -1) {
@@ -89,6 +104,13 @@
            $scope.sendPassword = value;
            $('#username').focus();
           };
+
+         var showForgotPassword = gnUtilityService.getUrlParameter('showforgotpassword');
+
+         if ((showForgotPassword) && (showForgotPassword === 'true')) {
+           $scope.setSendPassword(true);
+         }
+
          /**
           * Register user. An email will be sent to the new
           * user and another to the catalog admin if a profile
@@ -127,7 +149,11 @@
 
            $scope.userInfo.email = $scope.userInfo.username;
 
-           return $http.put('../api/0.1/user/actions/register', $scope.userInfo)
+           return $http.put('../api/0.1/user/actions/register', $scope.userInfo, {
+               headers: {
+                 'Accept-Language': gnLangs.current
+               }
+             })
            .success(function(data) {
              $rootScope.$broadcast('StatusUpdated', {
                title: data,
@@ -145,9 +171,12 @@
           * Remind user password.
           */
          $scope.remindMyPassword = function() {
-           $http.get('../api/0.1/user/' +
-           $scope.usernameToRemind +
-                        '/actions/forgot-password')
+           $http.put('../api/0.1/user/actions/forgot-password?username=' + $scope.usernameToRemind, null,
+             {
+               headers: {
+                'Accept-Language': gnLangs.current
+               }
+             })
             .success(function(data) {
              $scope.sendPassword = false;
              $rootScope.$broadcast('StatusUpdated', {
@@ -171,6 +200,10 @@
            $http.patch('../api/0.1/user/' + $scope.userToRemind, {
              password: $scope.password,
              changeKey: $scope.changeKey
+           }, {
+             headers: {
+               'Accept-Language': gnLangs.current
+             }
            })
             .success(function(data) {
              $rootScope.$broadcast('StatusUpdated', {

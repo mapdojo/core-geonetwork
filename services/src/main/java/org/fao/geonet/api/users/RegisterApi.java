@@ -1,5 +1,5 @@
 //=============================================================================
-//===   Copyright (C) 2001-2007 Food and Agriculture Organization of the
+//===   Copyright (C) 2001-2021 Food and Agriculture Organization of the
 //===   United Nations (FAO-UN), United Nations World Food Programme (WFP)
 //===   and United Nations Environment Programme (UNEP)
 //===
@@ -33,6 +33,7 @@ import org.fao.geonet.domain.Profile;
 import org.fao.geonet.domain.ReservedGroup;
 import org.fao.geonet.domain.User;
 import org.fao.geonet.domain.UserGroup;
+import org.fao.geonet.kernel.security.SecurityProviderConfiguration;
 import org.fao.geonet.kernel.setting.SettingManager;
 import org.fao.geonet.kernel.setting.Settings;
 import org.fao.geonet.repository.GroupRepository;
@@ -45,6 +46,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.ObjectError;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
@@ -53,6 +57,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 
 import java.sql.SQLException;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
@@ -62,6 +68,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import jeeves.server.context.ServiceContext;
+import springfox.documentation.annotations.ApiIgnore;
 
 @EnableWebMvc
 @Service
@@ -78,6 +85,9 @@ public class RegisterApi {
     @Autowired
     LanguageUtils languageUtils;
 
+    @Autowired(required=false)
+    SecurityProviderConfiguration securityProviderConfiguration;
+
     @ApiOperation(value = "Create user account",
         nickname = "registerUser",
         notes = "User is created with a registered user profile. username field is ignored and the email is used as " +
@@ -93,13 +103,20 @@ public class RegisterApi {
             required = true)
         @RequestBody
             UserRegisterDto userRegisterDto,
-        HttpServletRequest request)
+        @ApiIgnore
+            BindingResult bindingResult,
+        @ApiIgnore
+            HttpServletRequest request)
         throws Exception {
 
         Locale locale = languageUtils.parseAcceptLanguage(request.getLocales());
         ResourceBundle messages = ResourceBundle.getBundle("org.fao.geonet.api.Messages", locale);
 
-        ServiceContext context = ApiUtils.createServiceContext(request);
+        if (securityProviderConfiguration != null && !securityProviderConfiguration.isUserProfileUpdateEnabled()) {
+            return new ResponseEntity<>(messages.getString("security_provider_unsupported_functionality"), HttpStatus.PRECONDITION_FAILED);
+        }
+
+        try (ServiceContext context = ApiUtils.createServiceContext(request)) {
 
         SettingManager sm = context.getBean(SettingManager.class);
         boolean selfRegistrationEnabled = sm.getValueAsBool(Settings.SYSTEM_USERSELFREGISTRATION_ENABLE);
@@ -118,6 +135,22 @@ public class RegisterApi {
                 return new ResponseEntity<>(
                     messages.getString("recaptcha_not_valid"), HttpStatus.PRECONDITION_FAILED);
             }
+        }
+
+        // Validate the user registration
+        if (bindingResult.hasErrors()) {
+            List<ObjectError> errorList = bindingResult.getAllErrors();
+
+            StringBuilder sb = new StringBuilder();
+            Iterator<ObjectError> it = errorList.iterator();
+            while (it.hasNext()) {
+                sb.append(messages.getString(it.next().getDefaultMessage()));
+                if (it.hasNext()) {
+                    sb.append(", ");
+                }
+            }
+
+            return new ResponseEntity<>(sb.toString(), HttpStatus.PRECONDITION_FAILED);
         }
 
         final UserRepository userRepository = context.getBean(UserRepository.class);
@@ -140,6 +173,7 @@ public class RegisterApi {
 
         // user.setUsername(userRegisterDto.getUsername());
         user.setName(userRegisterDto.getName());
+        user.setSurname(userRegisterDto.getSurname());
         user.setOrganisation(userRegisterDto.getOrganisation());
         user.setProfile(Profile.findProfileIgnoreCase(userRegisterDto.getProfile()));
         user.getAddresses().add(userRegisterDto.getAddress());
@@ -205,6 +239,7 @@ public class RegisterApi {
             messages.getString("user_registered"),
             user.getUsername()
         ), HttpStatus.CREATED);
+      }
     }
 
     Group getGroup(ServiceContext context) throws SQLException {

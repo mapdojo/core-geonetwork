@@ -163,8 +163,8 @@ public class BaseMetadataManager implements IMetadataManager {
     private IMetadataSchemaUtils metadataSchemaUtils;
     @Autowired
     private GroupRepository groupRepository;
-    @Autowired
-    private MetadataStatusRepository metadataStatusRepository;
+//    @Autowired
+//    private MetadataStatusRepository metadataStatusRepository;
     @Autowired
     private MetadataValidationRepository metadataValidationRepository;
     @Autowired
@@ -220,13 +220,31 @@ public class BaseMetadataManager implements IMetadataManager {
         metadataIndexer.setMetadataManager(this);
     }
 
-    public void init(ServiceContext context, Boolean force) throws Exception {
+    /**
+     * Setup using app handler service context.
+     *
+     * @param appHandlerServiceContext
+     * @throws Exception
+     */
+    public void init(ServiceContext appHandlerServiceContext) throws Exception {
         try {
-            harvestInfoProvider = context.getBean(HarvestInfoProvider.class);
+            harvestInfoProvider = appHandlerServiceContext.getBean(HarvestInfoProvider.class);
         } catch (Exception e) {
             // If it doesn't exist, that's fine
         }
+    }
 
+    @Override
+    public void destroy() throws Exception {
+    }
+
+    /**
+     * Reindex content, refreshing the index for any content that has changed.
+     *
+     * @param forceReindex Force reindex of all content
+     * @throws Exception
+     */
+    public void refreshIndex(boolean forceReindex) throws Exception {
         // From DataManager:
 
         // get lastchangedate of all metadata in index
@@ -268,7 +286,7 @@ public class BaseMetadataManager implements IMetadataManager {
                     LOGGER_DATA_MANAGER.debug("- idxLastChange: {}", idxLastChange);
 
                     // date in index contains 't', date in DBMS contains 'T'
-                    if (force || !idxLastChange.equalsIgnoreCase(lastChange)) {
+                    if (forceReindex || !idxLastChange.equalsIgnoreCase(lastChange)) {
                         LOGGER_DATA_MANAGER.debug("-  will be indexed");
                         toIndex.add(id);
                     }
@@ -283,7 +301,7 @@ public class BaseMetadataManager implements IMetadataManager {
         // if anything to index then schedule it to be done after servlet is
         // up so that any links to local fragments are resolvable
         if (toIndex.size() > 0) {
-            metadataIndexer.batchIndexInThreadPool(context, toIndex);
+            metadataIndexer.batchIndexInThreadPool( toIndex);
         }
 
         if (docs.size() > 0) { // anything left?
@@ -343,7 +361,6 @@ public class BaseMetadataManager implements IMetadataManager {
         int intId = Integer.parseInt(id);
         metadataRatingByIpRepository.deleteAllById_MetadataId(intId);
         metadataValidationRepository.deleteAllById_MetadataId(intId);
-        metadataStatusRepository.deleteAllById_MetadataId(intId);
         userSavedSelectionRepository.deleteAllByUuid(metadataUtils.getMetadataUuid(id));
 
         // Logical delete for metadata file uploads
@@ -850,6 +867,7 @@ public class BaseMetadataManager implements IMetadataManager {
         String popularity = "" + dataInfo.getPopularity();
         String rating = "" + dataInfo.getRating();
         String owner = "" + metadata.getSourceInfo().getOwner();
+        Integer groupOwner = metadata.getSourceInfo().getGroupOwner();
         String displayOrder = "" + dataInfo.getDisplayOrder();
 
         Element info = new Element(Edit.RootChild.INFO, Edit.NAMESPACE);
@@ -885,6 +903,15 @@ public class BaseMetadataManager implements IMetadataManager {
         if (user != null) {
             String ownerName = user.getName();
             addElement(info, Edit.Info.Elem.OWNERNAME, ownerName);
+        }
+
+        // add groupowner name
+        if (groupOwner != null) {
+            Group group = groupRepository.findOne(groupOwner);
+            if (group != null) {
+                String groupOwnerName = group.getName();
+                addElement(info, Edit.Info.Elem.GROUPOWNERNAME, groupOwnerName);
+            }
         }
 
         for (MetadataCategory category : metadata.getCategories()) {
@@ -1018,7 +1045,9 @@ public class BaseMetadataManager implements IMetadataManager {
             result.addContent(env);
             // apply update-fixed-info.xsl
             Path styleSheet = metadataSchemaUtils.getSchemaDir(schema).resolve(
-                metadata != null && metadata.getDataInfo().getType() == MetadataType.SUB_TEMPLATE ?
+                metadata != null &&
+                    (metadata.getDataInfo().getType() == MetadataType.SUB_TEMPLATE
+                        || metadata.getDataInfo().getType() == MetadataType.TEMPLATE_OF_SUB_TEMPLATE) ?
                     Geonet.File.UPDATE_FIXED_INFO_SUBTEMPLATE :
                     Geonet.File.UPDATE_FIXED_INFO);
             result = Xml.transform(result, styleSheet);

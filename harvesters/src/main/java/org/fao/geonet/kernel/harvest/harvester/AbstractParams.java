@@ -24,7 +24,7 @@
 package org.fao.geonet.kernel.harvest.harvester;
 
 import com.google.common.collect.Maps;
-import com.vividsolutions.jts.util.Assert;
+import org.locationtech.jts.util.Assert;
 import org.apache.commons.lang.StringUtils;
 import org.fao.geonet.ApplicationContextHolder;
 import org.fao.geonet.Logger;
@@ -116,7 +116,9 @@ public abstract class AbstractParams implements Cloneable {
     }
 
     /**
-     * @param node
+     * Setup parameters with the provided configuration.
+     *
+     * @param node harvester configuration
      * @throws BadInputEx
      */
     public void create(Element node) throws BadInputEx {

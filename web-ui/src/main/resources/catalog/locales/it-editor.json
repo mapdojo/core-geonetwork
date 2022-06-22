@@ -37,6 +37,7 @@
     "chooseContactRole": "o scegli il ruolo",
     "chooseEntry": "Cerca nella rubrica",
     "clickToAddResource": "Clicca per selezionare questa risorsa",
+    "externalResourceManagement": "Click to go to external resource manager",
     "beforeUnloadEditor": "Potresti avere modifiche non salvate dall'ultimo salvataggio {{timeAgo}}.",
     "fieldIsRemoved": "Questo campo sarà rimosso",
     "editRecords": "Modifica selezione",
@@ -420,5 +421,6 @@
     "badGmlProjectionCode": "The geometry projection <b>{{srsName}}</b> defined in the XML is not valid. Please edit the xml to fix the srs name or enter a new geometry.",
     "draft": "Working copy",
     "link": "Collegamento",
-    "link-text": "Link text"
+    "link-text": "Link text",
+    "confirmCancelEdit": "Do you want to cancel all changes and close the editor?"
 }

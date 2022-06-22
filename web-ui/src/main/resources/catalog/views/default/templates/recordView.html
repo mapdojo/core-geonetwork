@@ -23,11 +23,23 @@
   </div>
 
   <div class="container">
-    <div class="alert alert-warning"
-        data-ng-hide="!mdView.loadDetailsFinished || mdView.current.record"
-        data-translate=""
-        data-translate-values="{uuid: '{{recordIdentifierRequested | htmlToPlaintext}}', url: '{{url | encodeURIComponent}}'}">
+    <div ng-if="!authenticated" class="alert alert-warning"
+         data-ng-hide="!mdView.loadDetailsFinished || mdView.current.record"
+         data-translate=""
+         data-translate-values="{uuid: '{{recordIdentifierRequested | htmlToPlaintext}}', url: '{{url | encodeURIComponent}}'}">
       recordNotFound
+    </div>
+    <div ng-if="authenticated && user.profile != 'Administrator'" class="alert alert-warning"
+         data-ng-hide="!mdView.loadDetailsFinished || mdView.current.record"
+         data-translate=""
+         data-translate-values="{uuid: '{{recordIdentifierRequested | htmlToPlaintext}}', url: '{{url | encodeURIComponent}}'}">
+      recordNotFoundAuthenticatedUser
+    </div>
+    <div ng-if="authenticated && user.profile === 'Administrator'" class="alert alert-warning"
+         data-ng-hide="!mdView.loadDetailsFinished || mdView.current.record"
+         data-translate=""
+         data-translate-values="{uuid: '{{recordIdentifierRequested | htmlToPlaintext}}', url: '{{url | encodeURIComponent}}'}">
+      recordNotFoundAuthenticatedAdministrator
     </div>
     <div class="row"
         data-ng-show="!mdView.loadDetailsFinished">
@@ -90,11 +102,12 @@
           <div class="btn-group pull-left" role="group">
             <a class="btn btn-default"
                href
-               data-ng-show="user.canEditRecord(mdView.current.record) && (user.isReviewerOrMore() || mdView.current.record.mdStatus != 4 || !isMdWorkflowEnable)"
+               data-ng-show="(!mdView.current.record.isPublished() || (mdView.current.record.isPublished() && user.canDeletePublishedMetadata()) ) && user.canEditRecord(mdView.current.record)
+                            && (user.isReviewerOrMore() || mdView.current.record.mdStatus != 4 || !isMdWorkflowEnable)"
                data-gn-click-and-spin="deleteRecord(mdView.current.record)"
                data-gn-confirm-click="{{(mdView.current.record.draft != 'y') ? 'deleteRecordConfirm' : 'deleteWorkingCopyRecordConfirm' | translate:mdView.current.record}}"
                title="{{(mdView.current.record.draft != 'y') ? 'delete' : 'cancelWorkingCopy' | translate}}">
-              <span class="fa fa-fw fa-times"></span>
+              <span class="fa fa-fw {{(mdView.current.record.draft != 'y') ? 'fa-trash' : 'fa-times'}}"></span>
               <span data-translate="" class="hidden-sm hidden-xs" data-ng-if="mdView.current.record.draft == 'y'">cancelWorkingCopy</span>
               <span data-translate="" class="hidden-sm hidden-xs" data-ng-if="mdView.current.record.draft != 'y'">delete</span>
             </a>
@@ -117,7 +130,7 @@
             <ul class="dropdown-menu" role="menu">
               <li role="menuitem"
                   data-ng-repeat="f in formatter.list"
-                  data-ng-class="currentFormatter === f.url ? 'disabled' : ''">
+                  data-ng-class="currentFormatterWithoutDraftInfo() === f.url ? 'disabled' : ''">
                 <a href=""
                    gn-metadata-open="mdView.current.record"
                    gn-records="mdView.records"
@@ -168,7 +181,7 @@
 
             <div data-gn-related="mdView.current.record"
                 data-user="user"
-                data-types="parent|children|brothersAndSisters|services|datasets"
+                data-types="parent|children|brothersAndSisters|services|datasets|related"
                 data-title="{{'associatedResources' | translate}}">
             </div>
           </div>
@@ -176,7 +189,7 @@
           <div data-gn-related-observer>
             <div data-gn-related="mdView.current.record"
                 data-user="user"
-                data-types="fcats|related"
+                data-types="fcats"
                 data-title="{{'featureCatalog' | translate}}">
             </div>
             <div data-gn-related="mdView.current.record"
@@ -499,25 +512,6 @@
             </div>
           </section>
 
-          <div data-gn-userfeedback='mdView.current.record'
-              data-gn-user={{user.username}}
-              data-ng-if="isUserFeedbackEnabled && mdView.current.record.draft != 'y'">
-          </div>
-          <div class="gn-md-feedback-buttons clearfix">
-            <div class="pull-left"
-                    data-gn-userfeedbackfull='mdView.current.record'
-                    data-gn-user={{user.username}}
-                    data-ng-if="isUserFeedbackEnabled && mdView.current.record.draft != 'y'">
-            </div>
-            <div class="pull-left"
-                    data-gn-userfeedbacknew='mdView.current.record'
-                    data-gn-user={{user.username}}
-                    data-ng-if="isUserFeedbackEnabled && mdView.current.record.draft != 'y'">
-            </div>
-
-          </div>
-          <div data-gn-md-feedback="mdView.current.record"></div>
-
           <section class="gn-md-side-extent" data-ng-if="mdView.current.record.geoBox || mdView.current.record.boundingPolygon">
             <h2>
               <i class="fa fa-fw fa-map-marker"></i>
@@ -542,8 +536,7 @@
                   data-ng-if="mdView.current.record.creationDate ||
                               mdView.current.record.publicationDate ||
                               mdView.current.record.revisionDate ||
-                              mdView.current.record.tempExtentBegin ||
-                              mdView.current.record.tempExtentEnd">
+                              mdView.current.record.tempExtentPeriod">
             <h2>
               <i class="fa fa-fw fa-clock-o"></i>
               <span data-translate="">tempExtent</span>
@@ -569,13 +562,14 @@
                   data-format="YYYY-MM-DD"/>
             </dl>
             <dl
-              data-ng-show="mdView.current.record.tempExtentBegin ||
-                                mdView.current.record.tempExtentEnd">
+              data-ng-show="mdView.current.record.tempExtentPeriod.length > 0">
               <dt data-translate>tempExtentBegin</dt>
-              <dd>
-                <span data-gn-humanize-time="{{mdView.current.record.tempExtentBegin}}"/>
+              <dd data-ng-repeat="period in mdView.current.record.tempExtentPeriod track by $index">
+                <span data-gn-humanize-time="{{period.split('|')[0]}}"
+                      data-format="YYYY-MM-DD"/>
                 &nbsp;<i class="fa fa-fw fa-forward"></i>
-                <span data-gn-humanize-time="{{mdView.current.record.tempExtentEnd}}"/>
+                <span data-gn-humanize-time="{{period.split('|')[1]}}"
+                      data-format="YYYY-MM-DD"/>
               </dd>
             </dl>
             </p>
@@ -638,6 +632,23 @@
                     data-from-now=""></span>
             </p>
           </section>
+
+          <section data-ng-show="isRatingEnabled" class="gn-md-side-rating">
+            <h2>
+              <i class="fa fa-fw"></i>
+              <span data-translate="">rate</span>
+            </h2>
+            <div data-gn-metadata-rate="mdView.current.record"/>
+          </section>
+
+
+            <div data-gn-userfeedback='mdView.current.record'
+                 data-gn-user={{user.username}}
+                 data-ng-if="isUserFeedbackEnabled && mdView.current.record.draft != 'y'">
+            </div>
+            <div data-gn-md-feedback="mdView.current.record"></div>
+          </section>
+
 
           <section class="gn-md-side-social" data-ng-show="isSocialbarEnabled">
             <h2>

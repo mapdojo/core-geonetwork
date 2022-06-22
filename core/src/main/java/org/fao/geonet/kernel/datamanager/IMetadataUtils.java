@@ -23,6 +23,7 @@
 
 package org.fao.geonet.kernel.datamanager;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -49,21 +50,28 @@ import jeeves.server.UserSession;
 import jeeves.server.context.ServiceContext;
 
 /**
- * Utility interface for records
+ * Utility interface for working with records.
+ *
+ * Operates as a facade with utility methods orchestrating common operations using a constellation
+ * beans drawn from across the application.
  *
  * @author delawen
- *
  */
 public interface IMetadataUtils {
 
     /**
      * This is a hopefully soon to be deprecated initialization function to replace the @Autowired annotation
      *
-     * @param context
-     * @param force
+     * @param appHandlerContext   this is the app handler context from jeeves initialization
      * @throws Exception
      */
-    public void init(ServiceContext context, Boolean force) throws Exception;
+    public void init(ServiceContext appHandlerContext) throws Exception;
+
+    /**
+     * Clean up during application shutdown.
+     * @throws Exception
+     */
+    public void destroy() throws Exception;
 
     /**
      * Notify a metadata modification
@@ -118,6 +126,13 @@ public interface IMetadataUtils {
 
 
     String extractDefaultLanguage(String schema, Element md) throws Exception;
+
+    /**
+     * Extract Multilinugal titles from the metadata record using the schema XSL for title extraction)
+     */
+    LinkedHashMap<String, String> extractTitles(String schema, Element md) throws Exception;
+
+    LinkedHashMap<String, String> extractTitles(@Nonnull String id) throws Exception;
 
     /**
      * Extract the last editing date from the record
@@ -252,6 +267,11 @@ public interface IMetadataUtils {
      * Retrieves a metadata (in xml) given its id with no geonet:info.
      */
     Element getMetadataNoInfo(ServiceContext srvContext, String id) throws Exception;
+
+    /**
+     * remove the geonet:info element from the supplied metadata.
+     */
+    Element removeMetadataInfo(Element md) throws Exception;
 
     /**
      * Retrieves a metadata element given it's ref.

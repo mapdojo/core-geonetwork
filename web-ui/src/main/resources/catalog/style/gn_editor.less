@@ -324,10 +324,10 @@ form.gn-editor {
       width: 40%;
     }
     > input[type=date].gn-notime {
-      width: 100%;
+      width: 100% !important;
     }
     > input[type=time].hidden {
-      width: 0%;
+      width: 0% !important;
     }
     .gn-indeterminate-position {
       display: table-cell;
@@ -430,7 +430,7 @@ form.gn-editor {
   .gn-value .col-xs-4 {
       padding-right: 0px;
   }
-  
+
   div.th-inner {
     font-size: 12px;
   }
@@ -600,6 +600,12 @@ form.gn-tab-inspire {
     to be higher than view port
     as the modal does not have overflow. */
     max-height: 50vh;
+    @media (max-height: 786px) {
+      max-height: 35vh;
+    }
+    @media (max-height: 550px) {
+      max-height: 23vh;
+    }
   }
 
   .gn-record {
@@ -608,6 +614,22 @@ form.gn-tab-inspire {
     }
   }
 
+}
+.onlinesrc-container {
+  .gn-layers-grid-container {
+    hr {
+      display: none;
+    }
+    .gn-layer-tree {
+      padding-left: 0;
+      .gn-layer-tree {
+        padding-left: 20px;
+        li {
+          padding: 5px 0;
+        }
+      }
+    }
+  }
 }
 
 table.gn-data-store {
@@ -950,7 +972,7 @@ gn-draft-validation-widget {
     right: 0;
     overflow: auto;
     max-height: 100%;
-    padding-bottom: 110px;
+    padding-bottom: 150px;
   }
 }
 

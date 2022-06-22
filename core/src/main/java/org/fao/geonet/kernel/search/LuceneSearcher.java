@@ -1,5 +1,5 @@
 //==============================================================================
-//===	Copyright (C) 2001-2007 Food and Agriculture Organization of the
+//===	Copyright (C) 2001-2022 Food and Agriculture Organization of the
 //===	United Nations (FAO-UN), United Nations World Food Programme (WFP)
 //===	and United Nations Environment Programme (UNEP)
 //===
@@ -26,8 +26,8 @@ package org.fao.geonet.kernel.search;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.io.WKTReader;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.io.WKTReader;
 import jeeves.constants.Jeeves;
 import jeeves.server.ServiceConfig;
 import jeeves.server.UserSession;
@@ -105,7 +105,6 @@ import org.fao.geonet.kernel.search.lucenequeries.DateRangeQuery;
 import org.fao.geonet.kernel.search.spatial.SpatialFilter;
 import org.fao.geonet.kernel.setting.SettingInfo;
 import org.fao.geonet.languages.LanguageDetector;
-import org.fao.geonet.repository.OperationAllowedRepository;
 import org.fao.geonet.repository.SourceRepository;
 import org.fao.geonet.repository.UserGroupRepository;
 import org.fao.geonet.repository.specification.UserGroupSpecs;
@@ -116,7 +115,7 @@ import org.jdom.Element;
 import org.jdom.JDOMException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.data.jpa.domain.Specification;
 
 import javax.annotation.Nonnull;
@@ -191,6 +190,17 @@ public class LuceneSearcher extends MetaSearcher implements MetadataRecordSelect
     // MetaSearcher API
     //
 
+    /**
+     * Async log of search details.
+     *
+     * @param srvContext
+     * @param config
+     * @param query
+     * @param numHits
+     * @param sort
+     * @param geomWKT
+     * @param sm
+     */
     public static void logSearch(ServiceContext srvContext, ServiceConfig config, Query query, int numHits, Sort sort, String geomWKT,
                                  SearchManager sm) {
         SettingInfo si = srvContext.getBean(SettingInfo.class);
@@ -916,7 +926,7 @@ public class LuceneSearcher extends MetaSearcher implements MetadataRecordSelect
     }
 
     /**
-     * Get Lucene index fields for matching records
+     * Get Lucene index fields for matching records (a single value for each field)
      *
      * @param priorityLang Preferred index language to use.
      * @param field        Field to search for (eg. _uuid)
@@ -926,6 +936,25 @@ public class LuceneSearcher extends MetaSearcher implements MetadataRecordSelect
      *                     true when searching on uuid field and only one record is expected.
      */
     public static Map<String, Map<String, String>> getAllMetadataFromIndexFor(String priorityLang, String field, String value, Set<String> returnFields, boolean checkAllHits) throws Exception {
+        return getAllMetadataFromIndexFor(priorityLang, field, value, returnFields, checkAllHits, false);
+    }
+
+    /**
+     * Get Lucene index fields for matching records (a single value for each field)
+     *
+     * @param priorityLang Preferred index language to use.
+     * @param field        Field to search for (eg. _uuid)
+     * @param value        Value to search for
+     * @param returnFields Fields to return
+     * @param checkAllHits If false, only the first match is analyzed for returned field. Set to
+     *                     true when searching on uuid field and only one record is expected.
+     * @param allValues    If false, only the field vaue is returned for each field. Set to
+     *                     true to return all the values as a comma separated list.
+     *
+     */
+    public static Map<String, Map<String, String>> getAllMetadataFromIndexFor(String priorityLang, String field,
+                                                                              String value, Set<String> returnFields,
+                                                                              boolean checkAllHits, boolean allValues) throws Exception {
         final IndexAndTaxonomy indexAndTaxonomy;
         final SearchManager searchmanager;
         ServiceContext context = ServiceContext.get();
@@ -965,7 +994,11 @@ public class LuceneSearcher extends MetaSearcher implements MetadataRecordSelect
                 Document doc = docVisitor.getDocument();
 
                 for (String fieldname : returnFields) {
-                    values.put(fieldname, doc.get(fieldname));
+                    if (!allValues) {
+                        values.put(fieldname, doc.get(fieldname));
+                    } else {
+                        values.put(fieldname, String.join(",", doc.getValues(fieldname)));
+                    }
                 }
 
                 records.put(String.valueOf(counter), values);
@@ -1684,7 +1717,7 @@ public class LuceneSearcher extends MetaSearcher implements MetadataRecordSelect
      *
      * @throws IllegalArgumentException if the geometry param is prefixed by <code>region:</code> but the region is not
      * found in the available sources.
-     * @throws com.vividsolutions.jts.io.ParseException if geometry is not a valid WKT string and it doesn't start by
+     * @throws org.locationtech.jts.io.ParseException if geometry is not a valid WKT string and it doesn't start by
      * <code>region:</code>
      * @return a collection of {@link Geometry} obtained of the {@link Geonet.SearchResult#GEOMETRY} parameter or null if the
      * parameter is not present in the request.

@@ -214,9 +214,17 @@
         scope: {
           processReport: '=gnBatchReport'
         },
-        templateUrl: '../../catalog/components/utility/' +
-            'partials/batchreport.html',
+        templateUrl: function ($element, $attrs) {
+          return $attrs.templateUrl || '../../catalog/components/utility/' +
+            'partials/batchreport.html'
+        },
         link: function(scope, element, attrs) {
+
+          scope.hasMetadataInfo = function() {
+            return (scope.processReport && scope.processReport.metadataInfos &&
+              (Object.keys(scope.processReport.metadataInfos).length > 0));
+          }
+
           scope.$watch('processReport', function(n, o) {
             if (n && n != o) {
               scope.processReportWarning = n.notFound != 0 ||
@@ -647,7 +655,7 @@
            link: function(scope, element, attrs) {
              element.attr('placeholder', '...');
 
-             var url = gnUrlUtils.append('q@json',
+             var url = gnUrlUtils.append('q?_content_type=json',
               gnUrlUtils.toKeyValue({
                 _isTemplate: 's',
                 any: '*QUERY*',
@@ -1305,8 +1313,10 @@
           var link = attrs.gnActiveTbItem, href,
               isCurrentService = false;
 
-          // Replace lang in link
+          // Replace lang in link (three character language code i.e. eng, fre)
           link = link.replace('{{lang}}', gnLangs.getCurrent());
+          // Replace standard ISO lang in link (two character language code i.e. en, fr)
+          link = link.replace('{{isoLang}}', gnLangs.getIso2Lang(gnLangs.getCurrent()));
           link = link.replace('{{node}}', gnConfig.env.node);
 
           // Insert debug mode between service and route

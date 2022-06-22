@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2016 Food and Agriculture Organization of the
+ * Copyright (C) 2001-2021 Food and Agriculture Organization of the
  * United Nations (FAO-UN), United Nations World Food Programme (WFP)
  * and United Nations Environment Programme (UNEP)
  *
@@ -33,7 +33,6 @@ public class Settings {
     public static final String SYSTEM_SITE_LABEL_PREFIX = "system/site/labels/";
     public static final String SYSTEM_SERVER_HOST = "system/server/host";
     public static final String SYSTEM_SERVER_PORT = "system/server/port";
-    public static final String SYSTEM_SERVER_SECURE_PORT = "system/server/securePort";
     public static final String SYSTEM_SERVER_PROTOCOL = "system/server/protocol";
     public static final String SYSTEM_PLATFORM_VERSION = "system/platform/version";
     public static final String SYSTEM_PLATFORM_SUBVERSION = "system/platform/subVersion";
@@ -118,6 +117,8 @@ public class Settings {
     public static final String SYSTEM_THREADEDINDEXING_MAXTHREADS = "system/threadedindexing/maxthreads";
     public static final String SYSTEM_RESOURCE_PREFIX = "metadata/resourceIdentifierPrefix";
     public static final String SYSTEM_INSPIRE_REMOTE_VALIDATION_URL = "system/inspire/remotevalidation/url";
+    public static final String SYSTEM_INSPIRE_REMOTE_VALIDATION_URL_QUERY = "system/inspire/remotevalidation/urlquery";
+    public static final String SYSTEM_INSPIRE_REMOTE_VALIDATION_APIKEY = "system/inspire/remotevalidation/apikey";
     public static final String REGION_GETMAP_BACKGROUND = "region/getmap/background";
     public static final String REGION_GETMAP_MAPPROJ = "region/getmap/mapproj";
     public static final String REGION_GETMAP_WIDTH = "region/getmap/width";
@@ -129,12 +130,20 @@ public class Settings {
     public static final String METADATA_WORKFLOW_ALLOW_PUBLISH_NON_APPROVED_MD = "metadata/workflow/allowPublishNonApprovedMd";
 
     public static final String METADATA_IMPORT_RESTRICT = "metadata/import/restrict";
+    public static final String METADATA_IMPORT_USERPROFILE = "metadata/import/userprofile";
+    public static final String METADATA_PUBLISHED_DELETE_USERPROFILE = "metadata/delete/profilePublishedMetadata";
     public static final String METADATA_BACKUPARCHIVE_ENABLE = "metadata/backuparchive/enable";
     public static final String METADATA_VCS = "metadata/vcs/enable";
     public static final String VIRTUAL_SETTINGS_SUFFIX_ISDEFINED = "IsDefined";
     public static final String NODE = "node/id";
     public static final String NODE_DEFAULT = "node/default";
     public static final String NODE_NAME = "node/name";
+
+    public static final String SYSTEM_SECURITY_PASSWORDENFORCEMENT_MINLENGH = "system/security/passwordEnforcement/minLength";
+    public static final String SYSTEM_SECURITY_PASSWORDENFORCEMENT_MAXLENGH = "system/security/passwordEnforcement/maxLength";
+    public static final String SYSTEM_SECURITY_PASSWORDENFORCEMENT_USEPATTERN = "system/security/passwordEnforcement/usePattern";
+    public static final String SYSTEM_SECURITY_PASSWORDENFORCEMENT_PATTERN = "system/security/passwordEnforcement/pattern";
+    public static final String SYSTEM_SECURITY_PASSWORD_ALLOWADMINRESET = "system/security/password/allowAdminReset";
 
     public static class GNSetting {
         private String name;

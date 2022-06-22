@@ -24,7 +24,7 @@
 package org.fao.geonet.services.region;
 
 import com.google.common.base.Optional;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import jeeves.server.context.ServiceContext;
 import jeeves.server.dispatchers.ServiceManager;
 import org.fao.geonet.api.records.extent.MapRenderer;
@@ -152,9 +152,8 @@ public class GetMap {
                                    @RequestParam(value = OUTPUT_FILE_NAME, required = false) String outputFileName,
                                    NativeWebRequest request) throws Exception {
 
-        ServiceContext context = serviceManager.createServiceContext("region.getmap." + imageFormat, lang,
-            request.getNativeRequest(HttpServletRequest.class));
-
+      try (ServiceContext context = serviceManager.createServiceContext("region.getmap." + imageFormat, lang,
+          request.getNativeRequest(HttpServletRequest.class))) {
         if (id == null && geomParam == null) {
             throw new BadParameterEx(Params.ID, "Either " + GEOM_PARAM + " or " + Params.ID + " is required");
         }
@@ -227,6 +226,7 @@ public class GetMap {
             headers.add("Content-Type", "image/" + imageFormat);
             return new HttpEntity<>(out.toByteArray(), headers);
         }
+      }
     }
 
 }

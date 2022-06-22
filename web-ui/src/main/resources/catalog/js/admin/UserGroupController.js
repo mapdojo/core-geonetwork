@@ -41,9 +41,9 @@
    */
   module.controller('GnUserGroupController', [
     '$scope', '$routeParams', '$http', '$rootScope',
-    '$translate', '$timeout',
+    '$translate', '$timeout', 'gnConfig', 'gnConfigService',
     function($scope, $routeParams, $http, $rootScope,
-        $translate, $timeout) {
+        $translate, $timeout, gnConfig, gnConfigService) {
 
       $scope.searchObj = {
         params: {
@@ -102,6 +102,19 @@
       $scope.isLoadingUsers = false;
       $scope.isLoadingGroups = false;
 
+      gnConfigService.load().then(function(c) {
+        $scope.passwordMinLength =
+          Math.min(gnConfig['system.security.passwordEnforcement.minLength'], 6);
+        $scope.passwordMaxLength =
+          Math.max(gnConfig['system.security.passwordEnforcement.maxLength'], 6);
+        $scope.usePattern = gnConfig['system.security.passwordEnforcement.usePattern'];
+        $scope.allowAdminReset = gnConfig['system.security.password.allowAdminReset'];
+
+        if ($scope.usePattern) {
+          $scope.passwordPattern = new RegExp(
+            gnConfig['system.security.passwordEnforcement.pattern']);
+        }
+      });
 
       // This is to force IE11 NOT to cache json requests
       if (!$http.defaults.headers.get) {
@@ -288,9 +301,11 @@
       };
 
 
+      $scope.resetPasswordOld = null;
       $scope.resetPassword1 = null;
       $scope.resetPassword2 = null;
       $scope.resetPassword = function() {
+        $scope.resetPasswordOld = null;
         $scope.resetPassword1 = null;
         $scope.resetPassword2 = null;
         $('#passwordResetModal').modal();
@@ -298,25 +313,46 @@
 
       $scope.saveNewPassword = function() {
         var params = {
+          passwordOld: $scope.resetPasswordOld,
           password: $scope.resetPassword1,
           password2: $scope.resetPassword2
         };
 
         $http.post('../api/users/' + $scope.userSelected.id +
             '/actions/forget-password',
-            $.param(params),
-            {
-              headers: {'Content-Type': 'application/x-www-form-urlencoded'}
-            })
+          params)
             .success(function(data) {
               $scope.resetPassword1 = null;
               $scope.resetPassword2 = null;
               $('#passwordResetModal').modal('hide');
             }).error(function(data) {
-              alert('Error occurred while resetting password: ' +
-                  data.error.message);
+              $rootScope.$broadcast('StatusUpdated', {
+                title: $translate.instant('resetPasswordError'),
+                error: data,
+                timeout: 0,
+                type: 'danger'});
             });
 
+      };
+
+      /**
+       * Hide reset password button for LDAP auth or if the user in the session
+       * is not the same as the user edited.
+       *
+       * @returns {boolean}
+       */
+      $scope.hideResetPassword = function() {
+        if ((!$scope.userSelected)
+            || (!$scope.userSelected.security)) {
+          return true;
+        } else if ($scope.userSelected.security.authType == 'LDAP') {
+          return true;
+        } else if ($scope.allowAdminReset && $scope.user.isAdministratorOrMore()) {
+          return false;
+        } else if ($scope.userSelected.username !== $scope.user.username) {
+          return true;
+        }
+        return false;
       };
 
       /**
@@ -512,12 +548,20 @@
             data)
             .then(
             function(r) {
-              $scope.unselectUser();
-              loadUsers();
-              $rootScope.$broadcast('StatusUpdated', {
-                msg: $translate.instant('userUpdated'),
-                timeout: 2,
-                type: 'success'});
+              if (r.status === 204) {
+                $scope.unselectUser();
+                loadUsers();
+                $rootScope.$broadcast('StatusUpdated', {
+                  msg: $translate.instant('userUpdated'),
+                  timeout: 2,
+                  type: 'success'});
+              } else {
+                $rootScope.$broadcast('StatusUpdated', {
+                  title: $translate.instant('userUpdateError'),
+                  error: r.data,
+                  timeout: 0,
+                  type: 'danger'});
+              }
             },
             function(r) {
               $rootScope.$broadcast('StatusUpdated', {
@@ -529,12 +573,24 @@
       };
 
       /**
-       * Delete a user.
+       * Ask for confirmation to delete an user.
        */
-      $scope.deleteUser = function(formId) {
+      $scope.removeUser = function() {
+        $('#gn-confirm-remove-user').modal('show');
+      }
+
+      /**
+       * Remove the user and refresh the list when done.
+       */
+      $scope.confirmRemoveUser = function() {
         $http.delete('../api/users/' +
             $scope.userSelected.id)
             .success(function(data) {
+              $rootScope.$broadcast('StatusUpdated', {
+                msg: $translate.instant('userRemoved'),
+                timeout: 2,
+                type: 'success'});
+
               $scope.unselectUser();
               loadUsers();
             })
@@ -589,7 +645,7 @@
         var contentType = req.getResponseHeader('Content-Type');
         var errorText = req.responseText;
         var errorCode = null;
-        if ('application/json' === contentType) {
+        if (contentType && (contentType.indexOf('application/json') == 0)) {
           var parsedError = JSON.parse(req.responseText);
         }
         $rootScope.$broadcast('StatusUpdated', {
@@ -661,10 +717,25 @@
         }
       };
 
-      $scope.deleteGroup = function(formId) {
+      /**
+       * Ask for confirmation to delete a group.
+       */
+      $scope.removeGroup = function() {
+        $('#gn-confirm-remove-group').modal('show');
+      }
+
+      /**
+       * Remove the group and refresh the list when done.
+       */
+      $scope.confirmRemoveGroup = function() {
         $http.delete('../api/groups/' +
                 $scope.groupSelected.id + '?force=true')
             .success(function(data) {
+              $rootScope.$broadcast('StatusUpdated', {
+                msg: $translate.instant('groupRemoved'),
+                timeout: 2,
+                type: 'success'});
+
               $scope.unselectGroup();
               loadGroups();
             })

@@ -237,5 +237,15 @@ public class StatusValue extends Localized {
         public static final String RECORDPROCESSINGCHANGE = "60";
         public static final String RECORDDELETED = "61";
         public static final String RECORDIMPORTED = "62";
+        public static final String RECORDRESTORED = "63";
+    }
+
+    @Override
+    public String toString() {
+        final StringBuffer sb = new StringBuffer("StatusValue{");
+        sb.append("_id=").append(_id);
+        sb.append(", _name='").append(_name).append('\'');
+        sb.append('}');
+        return sb.toString();
     }
 }

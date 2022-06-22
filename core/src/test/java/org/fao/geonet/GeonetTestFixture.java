@@ -25,7 +25,7 @@ package org.fao.geonet;
 
 import com.google.common.collect.Lists;
 
-import com.vividsolutions.jts.geom.MultiPolygon;
+import org.locationtech.jts.geom.MultiPolygon;
 
 import jeeves.server.ServiceConfig;
 import jeeves.server.context.ServiceContext;
@@ -167,12 +167,14 @@ public class GeonetTestFixture {
 
         ServiceContext serviceContext = test.createServiceContext();
 
+      try {
         ApplicationContextHolder.set(_applicationContext);
-        serviceContext.setAsThreadLocal();
+        //serviceContext.setAsThreadLocal();
 
         _applicationContext.getBean(LuceneConfig.class).configure("WEB-INF/config-lucene.xml");
         _applicationContext.getBean(SearchManager.class).initNonStaticData(100);
-        _applicationContext.getBean(DataManager.class).init(serviceContext, false);
+        _applicationContext.getBean(DataManager.class).init(serviceContext);
+        _applicationContext.getBean(DataManager.class).refreshIndex(true);
         _applicationContext.getBean(ThesaurusManager.class).init(true, serviceContext, "WEB-INF/data/config/codelist");
 
 
@@ -183,6 +185,9 @@ public class GeonetTestFixture {
             ThreadUtils.init(conn.getMetaData().getURL(), _applicationContext.getBean(SettingManager.class));
         }
 
+      } finally {
+        serviceContext.clearAsThreadLocal();
+      }
     }
 
 

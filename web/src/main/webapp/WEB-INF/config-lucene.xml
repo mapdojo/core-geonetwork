@@ -133,6 +133,7 @@
       <field name="_selected" tagName="selected"/>
       <field name="_source" tagName="source"/>
       <field name="_status" tagName="mdStatus"/>
+      <field name="_statusWorkflow" tagName="mdStatusWorkflow"/>
       <field name="_edit" tagName="edit"/>
       <field name="_root" tagName="root"/>
       <field name="_title" tagName="title" multilingualSortField="true"/>
@@ -175,6 +176,7 @@
       <field name="serviceType" tagName="serviceType"/>
       <field name="tempExtentBegin" tagName="tempExtentBegin"/>
       <field name="tempExtentEnd" tagName="tempExtentEnd"/>
+      <field name="tempExtentPeriod" tagName="tempExtentPeriod"/>
       <field name="geoBox" tagName="geoBox"/>
       <field name="boundingPolygon" tagName="boundingPolygon"/>
       <field name="extentDesc" tagName="geoDesc"/>

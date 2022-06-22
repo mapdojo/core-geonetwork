@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2001-2016 Food and Agriculture Organization of the
+ * Copyright (C) 2001-2021 Food and Agriculture Organization of the
  * United Nations (FAO-UN), United Nations World Food Programme (WFP)
  * and United Nations Environment Programme (UNEP)
  *
@@ -28,6 +28,7 @@
   goog.require('ga_print_directive');
   goog.require('gn_utility');
   goog.require('gn_filestore');
+  goog.require('gn_urlutils_service');
 
   /**
    * @ngdoc overview
@@ -46,7 +47,8 @@
     'gn_utility',
     'gn_filestore',
     'blueimp.fileupload',
-    'ga_print_directive'
+    'ga_print_directive',
+    'gn_urlutils_service'
   ])
   /**
    * Simple interface to add or remove overview.
@@ -137,7 +139,7 @@
 
             scope.removeOverview = function(thumbnail) {
               var url = thumbnail.url[gnCurrentEdit.mdLanguage];
-              if (url.match(".*/api/records/(.*)/attachments/.*") == null) {
+              if (url.match(".*/api/records/" + gnCurrentEdit.uuid + "/attachments/.*") == null) {
                 // An external URL
                 gnOnlinesrc.removeThumbnail(thumbnail).then(function() {
                   // and update list.
@@ -196,8 +198,8 @@
    *
    */
       .directive('gnOnlinesrcList', ['gnOnlinesrc', 'gnCurrentEdit',
-        'gnConfigService', '$filter',
-        function(gnOnlinesrc, gnCurrentEdit, gnConfigService, $filter) {
+        'gnConfigService', '$filter', 'gnConfig',
+        function(gnOnlinesrc, gnCurrentEdit, gnConfigService, $filter, gnConfig) {
           return {
             restrict: 'A',
             templateUrl: '../../catalog/components/edit/onlinesrc/' +
@@ -214,6 +216,13 @@
               scope.gnCurrentEdit.associatedPanelConfigId = attrs['configId'] || 'default';
               scope.relations = {};
               scope.gnCurrentEdit.codelistFilter  = attrs['codelistFilter'];
+              scope.isMdWorkflowEnableForMetadata = gnConfig['metadata.workflow.enable'] &&
+                scope.gnCurrentEdit.metadata.draft === 'y';
+              scope.isDoiApplicableForMetadata = gnConfig['system.publication.doi.doienabled']
+                && scope.gnCurrentEdit.metadata.isTemplate === 'n'
+                && scope.gnCurrentEdit.metadata.isPublished()
+                && scope.gnCurrentEdit.metadata.isHarvested === 'n';
+
 
               /**
                * Calls service 'relations.get' to load
@@ -236,6 +245,21 @@
                 return angular.isUndefined(scope.types) ? true :
                         category.match(scope.types) !== null;
               };
+
+              /**
+               * Doi can be published for a resource if:
+               *   - Doi publication is enabled.
+               *   - The resource matches doi.org url
+               *   - The workflow is not enabled for the metadata and
+               *     the metadata is published.
+               *
+               */
+              scope.canPublishDoiForResource = function (resource){
+                return scope.isDoiApplicableForMetadata
+                  && resource.lUrl !== null
+                  && resource.lUrl.match('doi.org') !== null
+                  && !scope.isMdWorkflowEnableForMetadata;
+              }
 
               /**
                * Builds metadata url checking if the resource points to internal or external url.
@@ -316,6 +340,8 @@
         'gnEditor',
         'gnCurrentEdit',
         'gnMap',
+        'gnMapsManager',
+        'gnUrlUtils',
         'gnGlobalSettings',
         'Metadata',
         '$rootScope',
@@ -325,7 +351,7 @@
         '$filter',
         '$log',
         function(gnOnlinesrc, gnOwsCapabilities, gnWfsService, gnSchemaManagerService,
-            gnEditor, gnCurrentEdit, gnMap, gnGlobalSettings, Metadata,
+            gnEditor, gnCurrentEdit, gnMap, gnMapsManager, gnUrlUtils, gnGlobalSettings, Metadata,
             $rootScope, $translate, $timeout, $http, $filter, $log) {
           return {
             restrict: 'A',
@@ -345,12 +371,16 @@
               post: function(scope, element, attrs) {
                 scope.clearFormOnProtocolChange = !(attrs.clearFormOnProtocolChange == "false"); //default to true (old behavior)
                 scope.popupid = attrs['gnPopupid'];
+                $(scope.popupid).on('hidden.bs.modal', function(){
+                  scope.$broadcast('onlineSrcDialogHidden', {"popupid": scope.popupid});
+                });
 
                 scope.config = null;
                 scope.linkType = null;
 
                 scope.loaded = false;
                 scope.layers = null;
+                scope.capabilitiesLayers = null;
                 scope.mapId = 'gn-thumbnail-maker-map';
                 scope.map = null;
 
@@ -367,30 +397,30 @@
                 scope.stateObj = {};
                 var projectedExtent = null;
 
-
                 function loadLayers() {
-                  if (!angular.isArray(scope.map.getSize()) ||
-                      scope.map.getSize().indexOf(0) >= 0) {
-                    $timeout(function() {
-                      scope.map.updateSize();
-                      if (projectedExtent != null) {
-                        scope.map.getView().fit(
-                          projectedExtent,
-                          scope.map.getSize());
-                      }
-                    }, 300);
-                  }
+                  scope.map.get('creationPromise').then(function() {
+                    if (!angular.isArray(scope.map.getSize()) ||
+                        scope.map.getSize().indexOf(0) >= 0) {
+                      $timeout(function() {
+                        scope.map.updateSize();
+                        if (projectedExtent != null) {
+                          scope.map.getView().fit(
+                            projectedExtent,
+                            scope.map.getSize());
+                        }
+                      }, 300);
+                    }
+                  })
 
                   // Reset map
-                  angular.forEach(scope.map.getLayers(), function(layer) {
-                    scope.map.removeLayer(layer);
+                  angular.forEach(scope.map.getLayers(), function(layer, index) {
+                    if (index !== 0) {
+                      scope.map.removeLayer(layer);
+                    }
                   });
 
                   var conf = gnMap.getMapConfig();
 
-                  scope.map.addLayer(new ol.layer.Tile({
-                    source:  new ol.source.OSM()
-                  }));
                   // TODO: Add base layer from config
                   // This does not work because createLayerFromProperties
                   // return a promise and base layer is added twice.
@@ -416,10 +446,10 @@
                       function(layer) {
                         scope.map.addLayer(new ol.layer.Tile({
                           source: new ol.source.TileWMS({
-                            url: layer.url,
+                            url: gnUrlUtils.remove(layer.url, ['request'], true),
                             params: {
                               'LAYERS': layer.name,
-                              'URL': layer.url
+                              'URL': gnUrlUtils.remove(layer.url, ['request'], true)
                             }
                           })
                         }));
@@ -470,7 +500,7 @@
                       '/attachments/print-thumbnail', null, {
                         params: {
                           jsonConfig: angular.fromJson(jsonSpec),
-                          rotationAngle: ((jsonSpec.layout == 'landscape')? 90 : 0)
+                          rotationAngle: 0
                         }
                       }).then(function() {
                     $rootScope.$broadcast('gnFileStoreUploadDone');
@@ -480,15 +510,17 @@
                 var initThumbnailMaker = function() {
 
                   if (!scope.loaded) {
-                    scope.map = new ol.Map({
-                      layers: [],
-                      renderer: 'canvas',
-                      view: new ol.View({
-                        center: [0, 0],
-                        projection: gnMap.getMapConfig().projection,
-                        zoom: 2
-                      })
-                    });
+                    scope.map = gnMapsManager.createMap(gnMapsManager.GENERATE_THUMBNAIL_MAP);
+
+                    // scope.map = new ol.Map({
+                    //   layers: [],
+                    //   renderer: 'canvas',
+                    //   view: new ol.View({
+                    //     center: [0, 0],
+                    //     projection: gnMap.getMapConfig().projection,
+                    //     zoom: 2
+                    //   })
+                    // });
 
                     // we need to wait the scope.hidden binding is done
                     // before rendering the map.
@@ -673,12 +705,36 @@
                       scope.params.desc= '';
                       initMultilingualFields();
                     }
+                    scope.$broadcast('onlineSrcDialogInited', {"popupid": scope.popupid});
                   };
                   function loadConfigAndInit(withInit) {
                     gnSchemaManagerService.getEditorAssociationPanelConfig(
                       gnCurrentEdit.schema,
                       gnCurrentEdit.associatedPanelConfigId).then(function (r) {
                       scope.config = r.config;
+
+
+                      /**
+                       *  Default configuration to handle WMS resources:
+                       *
+                       *    - resourcename: Add layer names to the name and description fields of the online resources.
+                       *    - url: Add layer names to url parameter defined in gnGlobalSettings.gnCfg.mods.search.addWMSLayersToMap.urlLayerParam
+                       */
+                      if (!scope.config.wmsResources) {
+                        scope.config.wmsResources = {};
+                        scope.config.wmsResources.addLayerNamesMode = "resourcename";
+                      }
+
+                      if (scope.config.wmsResources.addLayerNamesMode == "url") {
+                        scope.addLayersInUrl = gnGlobalSettings.gnCfg.mods.search.addWMSLayersToMap.urlLayerParam || '';
+                      } else {
+                        scope.addLayersInUrl = '';
+                      }
+
+                      if (scope.addLayersInUrl == '') {
+                        scope.config.wmsResources.addLayerNamesMode = "resourcename";
+                      }
+
 
                       if (withInit) {
                         init();
@@ -724,6 +780,7 @@
                 };
                 var resetProtocol = function() {
                   scope.layers = [];
+                  scope.capabilitiesLayers = null;
                   scope.OGCProtocol = false;
                   if (scope.params && !scope.isEditing) {
                     if (scope.clearFormOnProtocolChange) {
@@ -818,10 +875,22 @@
                     processParams.selectedLayers = scope.params.selectedLayers;
                   }
                   processParams.process = scope.params.linkType.process;
+
+                  processParams.wmsResources = scope.config.wmsResources;
+                  processParams.addLayersInUrl = scope.addLayersInUrl;
+
                   return scope.onlinesrcService.add(
                       processParams, scope.popupid).then(function() {
                     resetForm();
                   });
+                };
+
+                scope.isWMSProtocol = function () {
+                  return (scope.OGCProtocol == 'WMS');
+                };
+
+                scope.isWMSProtocolWithLayersInUrl = function () {
+                  return (scope.isWMSProtocol()  && (scope.addLayersInUrl != ''));
                 };
 
                 scope.onAddSuccess = function() {
@@ -846,7 +915,7 @@
                   }
 
                   if (!url) {
-                    return;
+                    return $q.reject( "" );
                   }
                   if (scope.OGCProtocol) {
                     scope.layers = [];
@@ -860,6 +929,7 @@
                                 scope.layers.push(l);
                               }
                             });
+                            scope.capabilitiesLayers = capabilities;
                           }).catch(function(error) {
                             scope.isUrlOk = error === 200;
                           });
@@ -867,6 +937,7 @@
                       return gnOwsCapabilities.getWMTSCapabilities(url)
                           .then(function(capabilities) {
                             scope.layers = [];
+                            scope.capabilitiesLayers = null;
                             scope.isUrlOk = true;
                             angular.forEach(capabilities.Layer, function(l) {
                               if (angular.isDefined(l.Identifier)) {
@@ -883,6 +954,7 @@
                       return gnWfsService.getCapabilities(url)
                         .then(function(capabilities) {
                           scope.layers = [];
+                          scope.capabilitiesLayers = null;
                           scope.isUrlOk = true;
                           angular.forEach(
                            capabilities.featureTypeList.featureType,
@@ -919,7 +991,7 @@
                           });
                     }
                   } else if (url.indexOf('http') === 0) {
-                    return $http.get(scope.onlinesrcService.getApprovedUrl(url)).then(function(response) {
+                    return $http.head(scope.onlinesrcService.getApprovedUrl(url)).then(function(response) {
                       scope.isUrlOk = response.status === 200;
                     },
                     function(response) {
@@ -927,27 +999,60 @@
                     });
                   } else {
                     scope.isUrlOk = true;
+                    return $q.reject( "" );
                   }
                 };
 
                 function checkIsOgc(protocol) {
 
-                  if (protocol && protocol.indexOf('OGC:WMS') >= 0) {
-                    return 'WMS';
+                  if (scope.config.loadMapCapabilities !== "false") {
+                    if (protocol && protocol.indexOf('OGC:WMS') >= 0) {
+                      return 'WMS';
+                    }
+                    else if (protocol && protocol.indexOf('OGC:WFS') >= 0) {
+                      return 'WFS';
+                    }
+                    else if (protocol && protocol.indexOf('OGC:WMTS') >= 0) {
+                      return 'WMTS';
+                    }
+                    else if (protocol && protocol.indexOf('OGC:WCS') >= 0) {
+                      return 'WCS';
+                    }
                   }
-                  else if (protocol && protocol.indexOf('OGC:WFS') >= 0) {
-                    return 'WFS';
-                  }
-                  else if (protocol && protocol.indexOf('OGC:WMTS') >= 0) {
-                    return 'WMTS';
-                  }
-                  else if (protocol && protocol.indexOf('OGC:WCS') >= 0) {
-                    return 'WCS';
-                  }
-                  else {
-                    return null;
-                  }
+
+                  return null;
                 }
+
+                var processSelectedWMSLayers = function() {
+                  // Only in layer tree widget
+                  if (scope.isWMSProtocolWithLayersInUrl()) {
+                    // Get the selected layers
+                    var selectedLayersNames = [];
+
+                    var params = gnUrlUtils.parseKeyValue(scope.params.url.split('?')[1]);
+
+                    if (params[scope.addLayersInUrl]) {
+                      scope.params.selectedLayers = [];
+                      selectedLayersNames = params[scope.addLayersInUrl].split(',');
+                    }
+
+                    scope.layers.forEach(function(l) {
+                      if (selectedLayersNames.indexOf(l.Name) != -1) {
+                        scope.params.selectedLayers.push(l);
+                      }
+                    });
+
+                    scope.params.url = gnUrlUtils.remove(scope.params.url, [scope.addLayersInUrl], true);
+                  } else {
+                    var selectedLayersNames = scope.params.name.split(',');
+                    scope.params.selectedLayers = [];
+                    scope.layers.forEach(function(l) {
+                      if (selectedLayersNames.indexOf(l.Name) != -1) {
+                        scope.params.selectedLayers.push(l);
+                      }
+                    });
+                  }
+                };
 
                 /**
                  * On protocol combo Change.
@@ -964,7 +1069,10 @@
                       scope.params.name = '';
                       scope.params.desc = '';
                     }
-                    scope.loadCurrentLink();
+
+                    scope.loadCurrentLink().then(function () {
+                      processSelectedWMSLayers();
+                    });
                   }
                 });
 
@@ -979,7 +1087,10 @@
                       urls[scope.ctrl.urlCurLang] : urls;
 
                   if (curUrl) {
-                    scope.loadCurrentLink();
+                    scope.loadCurrentLink().then(function () {
+                      // Editing an online resource after saving the metadata doesn't trigger the params.protocol watcher
+                      processSelectedWMSLayers();
+                    });
                     scope.isImage = curUrl.match(/.*.(png|jpg|jpeg|gif)$/i);
                   }
 
@@ -1001,21 +1112,22 @@
                         descs = [];
 
                     angular.forEach(scope.params.selectedLayers,
-                        function(layer) {
-                          names.push(layer.Name || layer.name);
-                          descs.push(layer.Title || layer.title);
-                        });
+                      function (layer) {
+                        names.push(layer.Name || layer.name);
+                        descs.push(layer.Title || layer.title);
+                    });
 
-                    if (scope.isMdMultilingual) {
-                      var langCode = scope.mdLangs[scope.mdLang];
-                      scope.params.name[langCode] = names.join(',');
-                      scope.params.desc[langCode] = descs.join(',');
-                    }
-                    else {
-                      angular.extend(scope.params, {
-                        name: names.join(','),
-                        desc: descs.join(',')
-                      });
+                    if (scope.config.wmsResources.addLayerNamesMode == "resourcename") {
+                      if (scope.isMdMultilingual) {
+                        var langCode = scope.mdLangs[scope.mdLang];
+                        scope.params.name[langCode] = names.join(',');
+                        scope.params.desc[langCode] = descs.join(',');
+                      } else {
+                        angular.extend(scope.params, {
+                          name: names.join(','),
+                          desc: descs.join(',')
+                        });
+                      }
                     }
                   }
                 });

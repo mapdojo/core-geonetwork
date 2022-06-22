@@ -29,9 +29,7 @@ import jeeves.server.context.ServiceContext;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpEntity;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.client.methods.*;
 import org.apache.http.entity.ContentType;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.entity.mime.MultipartEntityBuilder;
@@ -42,6 +40,7 @@ import org.fao.geonet.domain.MetadataValidationStatus;
 import org.fao.geonet.exceptions.ServiceNotFoundEx;
 import org.fao.geonet.kernel.datamanager.IMetadataSchemaUtils;
 import org.fao.geonet.kernel.schema.MetadataSchema;
+import org.fao.geonet.kernel.setting.SettingManager;
 import org.fao.geonet.lib.Lib;
 import org.fao.geonet.utils.GeonetHttpRequestFactory;
 import org.fao.geonet.utils.Log;
@@ -66,12 +65,21 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-// Utility class to access methods in Inspire Service.
-// Based on ETF Web API v.2 BETA
+import static org.fao.geonet.kernel.setting.Settings.SYSTEM_INSPIRE_REMOTE_VALIDATION_APIKEY;
+
+/**
+ * Utility class to access methods in Inspire Service.
+ *
+ * Based on ETF Web API v.2
+ * See https://docs.etf-validator.net/v2.0/Developer_manuals/WEB-API.html
+ */
 public class InspireValidatorUtils {
 
     @Autowired
     private GeonetHttpRequestFactory requestFactory;
+
+    @Autowired
+    SettingManager settingManager;
 
     /**
      * The Constant USER_AGENT.
@@ -201,8 +209,7 @@ public class InspireValidatorUtils {
      * @throws IOException
      */
     public boolean checkServiceStatus(ServiceContext context, String endPoint) throws IOException {
-
-        HttpGet request = new HttpGet(endPoint + CheckStatus_URL);
+        HttpGet request = new HttpGet(StringUtils.removeEnd(endPoint, "/") + CheckStatus_URL);
 
         // add request header
         request.addHeader("User-Agent", USER_AGENT);
@@ -230,7 +237,7 @@ public class InspireValidatorUtils {
      */
     private String uploadMetadataFile(ServiceContext context, String endPoint, InputStream xml) {
 
-        HttpPost request = new HttpPost(endPoint + TestObjects_URL + "?action=upload");
+        HttpPost request = new HttpPost(StringUtils.removeEnd(endPoint, "/") + TestObjects_URL + "?action=upload");
 
         request.addHeader("User-Agent", USER_AGENT);
         request.addHeader("Accept", ACCEPT);
@@ -278,7 +285,7 @@ public class InspireValidatorUtils {
             testsuite = getDefaultTestSuite();
         }
 
-        HttpGet request = new HttpGet(endPoint + ExecutableTestSuites_URL);
+        HttpGet request = new HttpGet(StringUtils.removeEnd(endPoint, "/") + ExecutableTestSuites_URL);
 
         request.addHeader("User-Agent", USER_AGENT);
         request.addHeader("Accept", ACCEPT);
@@ -340,33 +347,41 @@ public class InspireValidatorUtils {
      * @throws IOException   Signals that an I/O exception has occurred.
      * @throws JSONException the JSON exception
      */
-    private String testRun(ServiceContext context, String endPoint, String fileId, List<String> testList, String testTitle) {
+    private String testRun(ServiceContext context, String endPoint, String fileId, List<String> testList, String testTitle) throws JSONException, IOException {
 
-        HttpPost request = new HttpPost(endPoint + TestRuns_URL);
+        HttpPost request = new HttpPost(StringUtils.removeEnd(endPoint, "/") + TestRuns_URL);
         request.setHeader("Content-type", ACCEPT);
         request.addHeader("User-Agent", USER_AGENT);
         request.addHeader("Accept", ACCEPT);
+        addApiKey(request);
+
         ClientHttpResponse response = null;
 
         try {
             JSONObject json = new JSONObject();
             JSONArray tests = new JSONArray();
-            JSONObject argumets = new JSONObject();
+            JSONObject arguments = new JSONObject();
             JSONObject testObject = new JSONObject();
 
             json.put("label", "TEST " + testTitle + " - " + System.currentTimeMillis());
             json.put("executableTestSuiteIds", tests);
-            json.put("argumets", argumets);
+            json.put("arguments", arguments);
             json.put("testObject", testObject);
 
             for (String test : testList) {
                 tests.put(test);
             }
 
-            argumets.put("files_to_test", ".*");
-            argumets.put("tests_to_execute", ".*");
+            arguments.put("files_to_test", ".*");
+            arguments.put("tests_to_execute", ".*");
 
-            testObject.put("id", fileId);
+            if (fileId.startsWith("http")) {
+                JSONObject resourceObject = new JSONObject();
+                resourceObject.put("data", fileId);
+                testObject.put("resources", resourceObject);
+            } else {
+                testObject.put("id", fileId);
+            }
 
             StringEntity entity = new StringEntity(json.toString());
             request.setEntity(entity);
@@ -385,14 +400,30 @@ public class InspireValidatorUtils {
             } else {
                 Log.warning(Log.SERVICE,
                     "WARNING: INSPIRE service HTTP response: " + response.getStatusCode().value() + " for " + TestRuns_URL);
-                return null;
+                throw new IOException(String.format("Error while creating test on validator side. Status is: %d (%s). Error: %s",
+                    response.getStatusCode().value(),
+                    response.getStatusText(),
+                    response.getBody() != null
+                        ? CharStreams.toString(new InputStreamReader(response.getBody())) : ""
+                    ));
             }
 
         } catch (Exception e) {
             Log.error(Log.SERVICE, "Exception in INSPIRE service: " + endPoint, e);
-            return null;
+            throw e;
         } finally {
             IOUtils.closeQuietly(response);
+        }
+    }
+
+    /**
+     * See https://github.com/INSPIRE-MIF/helpdesk-validator/issues/594
+     */
+    private void addApiKey(HttpRequestBase request) {
+        String apikey =
+            settingManager.getValue(SYSTEM_INSPIRE_REMOTE_VALIDATION_APIKEY);
+        if (StringUtils.isNotEmpty(apikey)) {
+            request.addHeader("X-API-key", apikey);
         }
     }
 
@@ -409,10 +440,11 @@ public class InspireValidatorUtils {
             return false;
         }
 
-        HttpGet request = new HttpGet(endPoint + TestRuns_URL + "/" + testId + "/progress");
+        HttpGet request = new HttpGet(StringUtils.removeEnd(endPoint, "/") + TestRuns_URL + "/" + testId + "/progress");
 
         request.addHeader("User-Agent", USER_AGENT);
         request.addHeader("Accept", ACCEPT);
+        addApiKey(request);
 
         try (ClientHttpResponse response = this.execute(context, request)) {
             if (response.getStatusCode().value() == 200) {
@@ -458,10 +490,11 @@ public class InspireValidatorUtils {
             throw new Exception("");
         }
 
-        HttpGet request = new HttpGet(endPoint + TestRuns_URL + "/" + testId);
+        HttpGet request = new HttpGet(StringUtils.removeEnd(endPoint, "/") + TestRuns_URL + "/" + testId);
 
         request.addHeader("User-Agent", USER_AGENT);
         request.addHeader("Accept", ACCEPT);
+        addApiKey(request);
 
         try (ClientHttpResponse response = this.execute(context, request)) {
 
@@ -540,21 +573,51 @@ public class InspireValidatorUtils {
      * @throws IOException   Signals that an I/O exception has occurred.
      * @throws JSONException the JSON exception
      */
-    public String submitFile(ServiceContext context, String serviceEndpoint, InputStream record, String testsuite, String testTitle)
-        throws IOException {
+    public String submitFile(ServiceContext context, String serviceEndpoint, String serviceQueryEndpoint, InputStream record, String testsuite, String testTitle)
+        throws IOException, JSONException {
+
+        if (checkServiceStatus(context, serviceQueryEndpoint)) {
+            // Get the tests to execute
+            List<String> tests = getTests(context, serviceQueryEndpoint, testsuite);
+            // Upload file to test
+            String testFileId = uploadMetadataFile(context, serviceQueryEndpoint, record);
+
+            if (testFileId == null) {
+                Log.error(Log.SERVICE, "File not valid.", new IllegalArgumentException());
+                return null;
+            }
+
+            if (tests == null || tests.size() == 0) {
+                Log.error(Log.SERVICE,
+                    "Default test sequence not supported. Check org.fao.geonet.api.records.editing.InspireValidatorUtils.TESTS_TO_RUN_TG13.",
+                    new Exception());
+                return null;
+            }
+            // Return test id from Inspire service
+            return testRun(context, serviceEndpoint, testFileId, tests, testTitle);
+
+        } else {
+            ServiceNotFoundEx ex = new ServiceNotFoundEx(serviceEndpoint);
+            Log.error(Log.SERVICE, "Service unavailable.", ex);
+            throw ex;
+        }
+    }
+
+    /**
+     * Submit URL to the external ETF validator.
+     *
+     * @param testsuite
+     * @return the string
+     * @throws IOException   Signals that an I/O exception has occurred.
+     * @throws JSONException the JSON exception
+     */
+    public String submitUrl(ServiceContext context, String serviceEndpoint, String serviceEndpointQuery, String getRecordById, String testsuite, String testTitle)
+        throws IOException, JSONException {
 
         try {
-            if (checkServiceStatus(context, serviceEndpoint)) {
+            if (checkServiceStatus(context, serviceEndpointQuery)) {
                 // Get the tests to execute
                 List<String> tests = getTests(context, serviceEndpoint, testsuite);
-                // Upload file to test
-                String testFileId = uploadMetadataFile(context, serviceEndpoint, record);
-
-                if (testFileId == null) {
-                    Log.error(Log.SERVICE, "File not valid.", new IllegalArgumentException());
-                    return null;
-                }
-
                 if (tests == null || tests.size() == 0) {
                     Log.error(Log.SERVICE,
                         "Default test sequence not supported. Check org.fao.geonet.api.records.editing.InspireValidatorUtils.TESTS_TO_RUN_TG13.",
@@ -562,7 +625,7 @@ public class InspireValidatorUtils {
                     return null;
                 }
                 // Return test id from Inspire service
-                return testRun(context, serviceEndpoint, testFileId, tests, testTitle);
+                return testRun(context, serviceEndpoint, getRecordById, tests, testTitle);
 
             } else {
                 ServiceNotFoundEx ex = new ServiceNotFoundEx(serviceEndpoint);
